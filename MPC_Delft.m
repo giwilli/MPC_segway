@@ -3,9 +3,6 @@ B = B_lin_s;
 C = C_lin_s;
 D = D_lin_s;
 
-
-
-
 Ts = 0.01;
 sys_d = c2d(ss(A,B, C, D),Ts,'tustin');
 
@@ -115,7 +112,7 @@ for i = 1:M
     h = S.'*Q_bar*T*x0;
     g = b_bar - D_bar*T_tilde*x0;
     u = quadprog(H,h, G,g);
-    u_log(:,i) = u;
+    u_log(:,i) = u(1,:);
     x(:,i+1) = sys_d.A*x(:,i) + sys_d.B*u(1);
 end
 %% LQR for reference
@@ -128,7 +125,7 @@ u_log_lqr(:,1) = 0;
 
 for i = 1:M
     %disp(i);
-    u = -K*x(:,i);
+    u = -K*x_lqr(:,i);
     x_lqr(:,i+1) = (sys_d.A*x_lqr(:,i) + sys_d.B*u);
     u_log_lqr(:,i) = u;
 end
@@ -137,6 +134,7 @@ hold on
 t = 0:0.01:M*0.01;
 plot(t,x)
 plot(t, u_log)
-
+%%
 plot(t,x_lqr)
-plot(t,u_log_lqr)
+
+%%plot(t,u_log_lqr)
