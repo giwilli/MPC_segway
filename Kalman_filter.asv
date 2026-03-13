@@ -1,0 +1,24 @@
+A = sys_d.A;
+B = sys_d.B;
+C = sys_d.C;
+D = sys_d.D;
+P = (10^6)*eye(dim_A);
+Q_Kalm = 0.1*eye(dim_A);
+R_Kalm = 0.1*eye(dim_C);
+
+x_real = zeros(dim_A, M);
+x_pred = zeros(dim_A, M);
+u = ones(dim_B, M-1);
+
+
+
+for i = 1:M 
+    L = (P*C.')/(C*P*C.' + R);
+    y = C*x_real(:,i);
+    x_pred(:, i+1) = (A - A*L*C)*x_pred(:,i) + (B - A*L*D)*u(:, i) + A*L*y;
+    P = A*P*A.' - A*P*C.'
+
+end
+
+
+

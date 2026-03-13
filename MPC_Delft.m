@@ -134,7 +134,5 @@ hold on
 t = 0:0.01:M*0.01;
 plot(t,x)
 plot(t, u_log)
-%%
 plot(t,x_lqr)
-
-%%plot(t,u_log_lqr)
+plot(t,u_log_lqr)
