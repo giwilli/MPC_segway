@@ -29,7 +29,7 @@ dim_C = size(C,1);
 Q = 1000*eye(dim_A);
 R = 1*eye(dim_B);
 x0 = [-0.1;-0.1;-0.1;-0.1];
-
+y_ref = [0.0; 0.0];
 %% Constraints definition and Terminal Set
 
 c = [Inf; 7; pi/18; Inf];
@@ -150,3 +150,15 @@ subplot(2,1,2); % Bottom plot
 plot(t, u_mpc_log, t, u_lqr_log);
 title('Control Inputs (u)');
 legend('MPC', 'LQR');
+
+%% OTS
+A_aug = [(eye(dim_A)-sys_d.A) -sys_d.B;
+        sys_d.C zeros(dim_C,dim_B)];
+d_hat = 1;
+B_d = [0;0;0;0];
+C_d = [0;0.1];
+b_aug = [B_d*d_hat;(y_ref - C_d*d_hat)];
+
+% Define the constraints for x_ref and u_ref
+% Define the constraints for y_ref
+% Solve the Optimal Control Problem
