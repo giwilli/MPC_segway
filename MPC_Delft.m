@@ -9,17 +9,36 @@ sys_d = c2d(ss(A,B, C, D),Ts,'tustin');
 rank(ctrb(sys_d.A, sys_d.B))
 %%
 
-N = 100;
+global mptOptions
+mptOptions.verbose = 1;
+
+%%
+
+N = 70;
 dim_A = size(A,1);
 dim_B = size(B,2);
 dim_C = size(C,1);
 Q = 1000*eye(dim_A);
 R = 1*eye(dim_B);
 
-[P,K,L] = idare(A,B,Q,R);
+c = [Inf; 7; pi/18; Inf];
+u_bound = 42;
+
+model = LTISystem(sys_d);
+model.x.min = -c;
+model.x.max = c;
+model.u.min = -u_bound;
+model.u.max = u_bound;
+
+model.x.penalty = QuadFunction(Q);
+model.u.penalty = QuadFunction(R);
 
 
-P = 1000*P;
+
+Tset = model.LQRSet;
+P = model.LQRPenalty.weight;
+
+
 x0 = [-0.1;-0.1;-0.1;-0.1];
 
 T = zeros(dim_A*(N+1),dim_A);
@@ -42,42 +61,51 @@ H = (H+H')/2;
 h = S.'*Q_bar*T*x0;
 
 D = diag([0 1 1 0]);
-c = [Inf; 7; pi/18; Inf];
-u_bound = 42;
 
-D_tilde = [D*sys_d.A;-D*sys_d.A; zeros(1,4); zeros(1,4)];
+D_tilde = [D*sys_d.A;-D*sys_d.A; zeros(1,dim_A); zeros(1,dim_A)];
 E_tilde = [D*sys_d.B;-D*sys_d.B; 1; -1];
 b_tilde =[c;c;u_bound;u_bound];
-D_bar = kron(eye(N),D_tilde);
-E_bar = kron(eye(N),E_tilde);
-b_bar = repmat(b_tilde,[N,1]);
+D_bar_temp = kron(eye(N),D_tilde);
+E_bar_temp = kron(eye(N),E_tilde);
+b_bar_temp = repmat(b_tilde,[N,1]);
 T_tilde = T(1:end-dim_A,:);
 S_tilde = S(1:end-dim_A,:);
 
+%%
+
+
+D_terminal = Tset.A;
+c_terminal = Tset.b;
+
+D_tilde_term = [D_terminal*sys_d.A;-D_terminal*sys_d.A; zeros(1,dim_A); zeros(1,dim_A)];
+E_tilde_term = [D_terminal*sys_d.B;-D_terminal*sys_d.B; 0; 0];
+b_tilde_term = [c_terminal;c_terminal;0;0];
+
+tmp = zeros(1,N);
+tmp(:,end) = 1;
+D_bar_term_temp = kron(tmp,D_tilde_term);
+E_bar_term_temp = kron(tmp,E_tilde_term);
+b_bar_term_temp = b_tilde_term;
+
+D_bar = [D_bar_temp;D_bar_term_temp];
+E_bar = [E_bar_temp;E_bar_term_temp];
+b_bar = [b_bar_temp;b_bar_term_temp];
+
+%%
+
 G = D_bar*S_tilde + E_bar;
 g = b_bar - D_bar*T_tilde*x0;
-
-sys =  LTISystem('A', sys_d.A, 'B', sys_d.B, 'C', sys_d.C, 'D', sys_d.D);
-sys.x.min = -c;
-sys.x.max = c;
-sys.u.min = -u_bound;
-sys.u.max = u_bound;
-
-Xf = sys.invariantSet();
-Xf.plot()
-
-
-
 
 %%
 %u = quadprog(H,h, G,g);
 
 
-M = 2000;
+M = 1000;
 x = zeros(dim_A, (M+1));
 x(:,1) = x0;
 
 for i = 1:M
+    disp(i);
     x0 = x(:,i);
     h = S.'*Q_bar*T*x0;
     g = b_bar - D_bar*T_tilde*x0;
@@ -86,8 +114,5 @@ for i = 1:M
 end
 %%
 
-
-
-%%
-
-eig(sys_d.A)
+t = 0:0.01:M*0.01;
+plot(t,x)

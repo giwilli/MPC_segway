@@ -19,12 +19,12 @@ f = [x1_d; x2_d; x3_d; x4_d];
 
 A = jacobian(f, [x1 x2 x3 x4]);
 
-A_lin = subs(A, [x1,x2,x3,x4, u],[0,0,0,0,0])
+A_lin = subs(A, [x1,x2,x3,x4, u],[0,0,0,0,0]);
 
 B = jacobian(f, [u]);
-B_lin = subs(B, [x1,x2,x3,x4, u],[0,0,0,0, 0])
+B_lin = subs(B, [x1,x2,x3,x4, u],[0,0,0,0, 0]);
 
-C_lin = [1/R 0 0 0;0 0 0 1]
+C_lin = [1/R 0 0 0;0 0 0 1];
 D_lin = [0;0];
 
 
