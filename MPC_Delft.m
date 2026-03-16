@@ -13,10 +13,10 @@ mptOptions.verbose = 1;
 A = A_lin_s;
 B = B_lin_s;
 C = C_lin_s;
-D = D_lin_s;
+D_sys = D_lin_s;
 
 Ts = 0.01;
-sys_d = c2d(ss(A,B, C, D),Ts,'tustin');
+sys_d = c2d(ss(A,B, C, D_sys),Ts,'tustin');
 
 rank(ctrb(sys_d.A, sys_d.B))
 
@@ -154,10 +154,27 @@ legend('MPC', 'LQR');
 %% OTS
 A_aug = [(eye(dim_A)-sys_d.A) -sys_d.B;
         sys_d.C zeros(dim_C,dim_B)];
-d_hat = 1;
+d_hat = 0;
+y_ref = [0;0];
 B_d = [0;0;0;0];
 C_d = [0;0.1];
 b_aug = [B_d*d_hat;(y_ref - C_d*d_hat)];
+
+D = diag([0 1 1 0]);
+c = [1000; 7; pi/18; 1000];
+u_bound = 42;
+f = [c; u_bound];
+D_aug = [D; zeros(dim_B, dim_A)];
+E_aug = [zeros(dim_A,dim_B); ones(dim_B)];
+F_aug = [D_aug, E_aug;-D_aug, -E_aug];
+f_aug = [f; f];
+
+H_aug = eye(5);
+h_aug = zeros(5,1);
+state_aug = quadprog(H_aug, h_aug, F_aug, f_aug, A_aug, b_aug);
+
+x_ref = state_aug(1:4,1);
+u_ref = state_aug(5:end,1);
 
 % Define the constraints for x_ref and u_ref
 % Define the constraints for y_ref
