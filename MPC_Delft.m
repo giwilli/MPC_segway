@@ -134,7 +134,7 @@ H_aug = diag([0,0,0,0,1]);
 h_aug = zeros(5,1);
 
 
-[x_pred, P_Kalm] = Kalm_fn(sys_d.A, sys_d.B, sys_d.C, sys_d.D,x_pred,P_Kalm,Q_Kalm,R_Kalm,y,u_mpc_log(:,1),i);
+[x_pred, P_Kalm] = Kalm_fn(sys_d.A, sys_d.B, sys_d.C, sys_d.D,x_pred,P_Kalm,Q_Kalm,R_Kalm,y,u_mpc_log(:,1));
 
 for i = 1:M
     disp(i);
@@ -143,7 +143,7 @@ for i = 1:M
     x_ref_bar = repmat(x_ref,N+1);
     u_ref_bar = repmat(u_ref,N);
     % Update of the terminal constraint
-    c_terminal = Tset.b + D_terminal*x_ref;
+    c_terminal = c_terminal + D_terminal*x_ref;
     b_tilde_term = [c_terminal;c_terminal;0;0];
     b_bar_term_temp = b_tilde_term;
     b_bar = [b_bar_temp;b_bar_term_temp];
