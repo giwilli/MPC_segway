@@ -48,7 +48,10 @@ model.u.penalty = QuadFunction(R);
 
 %% Objective function weights (Compact Form)
 
-P = model.LQRPenalty.weight;
+%P = model.LQRPenalty.weight;
+P = load("P.mat");
+P = P.P;
+
 Q_bar = blkdiag(kron(eye(N),Q), P);
 R_bar = kron(eye(N),R);
 
