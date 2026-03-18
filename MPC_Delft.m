@@ -160,10 +160,11 @@ A_aug = [(eye(dim_A)-sys_d.A) -sys_d.B;
         H_sel*sys_d.C zeros(dim_HC,dim_B)];
 %det(A_aug);
 d_hat = 0;
-y_ref = 0;
+y_ref = 1;
 B_d = [0;0;0;0];
-C_d = H_sel*[0;0.1];
-b_aug = [B_d*d_hat;(y_ref - C_d*d_hat)];
+C_d_sys = [0;0.1];
+HC_d = H_sel*C_d_sys;
+b_aug = [B_d*d_hat;(y_ref - HC_d*d_hat)];
 
 % sys_d.C;
 % A_distrej = [(eye(dim_A)-sys_d.A) -sys_d.B;
@@ -184,15 +185,17 @@ f_aug = [f; f];
 H_aug = diag([0,0,0,0,1]);%eye(5);%
 h_aug = zeros(5,1);
 
-options = optimoptions('quadprog', 'MaxIterations', 2000, StepTolerance=0);
+options = optimoptions('quadprog', 'MaxIterations', 200);
 lb = [];
 ub = [];
 x0 = [];
 state_aug = quadprog(H_aug, h_aug, F_aug, f_aug, A_aug, b_aug,lb,ub,x0, options);
 
-x_ref = state_aug(1:4,1);
-u_ref = state_aug(5:end,1);
+x_ref = state_aug(1:4,1)
+u_ref = state_aug(5:end,1)
 
+%%
+[x_ref_fn,u_ref_fn] = OTS(y_ref,H_sel,sys_d.A,sys_d.B,sys_d.C,B_d,C_d_sys,d_hat,D,c,u_ref,200,H_aug,h_aug)
 % Define the constraints for x_ref and u_ref
 % Define the constraints for y_ref
 % Solve the Optimal Control Problem
