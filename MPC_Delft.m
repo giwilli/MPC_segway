@@ -19,6 +19,7 @@ Ts = 0.01;
 sys_d = c2d(ss(A,B, C, D_sys),Ts,'tustin');
 
 rank(ctrb(sys_d.A, sys_d.B))
+rank(obsv(sys_d.A, sys_d.C))
 
 %% Problem Fundamentals
 
@@ -108,6 +109,7 @@ g = b_bar - D_bar*T_tilde*x0;
 %% Closed Loop global paramters
 
 M = 1000;
+t = 0:0.01:M*0.01;
 
 %% Closed Loop MPC
 
@@ -152,15 +154,25 @@ title('Control Inputs (u)');
 legend('MPC', 'LQR');
 
 %% OTS
+H_sel = [1 0];
+dim_HC = size(H_sel*sys_d.C,1);
 A_aug = [(eye(dim_A)-sys_d.A) -sys_d.B;
-        sys_d.C zeros(dim_C,dim_B)];
+        H_sel*sys_d.C zeros(dim_HC,dim_B)];
+%det(A_aug);
 d_hat = 0;
-y_ref = [0;0];
+y_ref = 0;
 B_d = [0;0;0;0];
-C_d = [0;0.1];
+C_d = H_sel*[0;0.1];
 b_aug = [B_d*d_hat;(y_ref - C_d*d_hat)];
 
-D = diag([0 1 1 0]);
+% sys_d.C;
+% A_distrej = [(eye(dim_A)-sys_d.A) -sys_d.B;
+%         H_sel*sys_d.C C_d];
+% 
+% rank(A_distrej)
+% rank(A_aug)
+
+D = diag([1 1 1 1]);
 c = [1000; 7; pi/18; 1000];
 u_bound = 42;
 f = [c; u_bound];
@@ -169,9 +181,14 @@ E_aug = [zeros(dim_A,dim_B); ones(dim_B)];
 F_aug = [D_aug, E_aug;-D_aug, -E_aug];
 f_aug = [f; f];
 
-H_aug = eye(5);
+H_aug = diag([0,0,0,0,1]);%eye(5);%
 h_aug = zeros(5,1);
-state_aug = quadprog(H_aug, h_aug, F_aug, f_aug, A_aug, b_aug);
+
+options = optimoptions('quadprog', 'MaxIterations', 2000, StepTolerance=0);
+lb = [];
+ub = [];
+x0 = [];
+state_aug = quadprog(H_aug, h_aug, F_aug, f_aug, A_aug, b_aug,lb,ub,x0, options);
 
 x_ref = state_aug(1:4,1);
 u_ref = state_aug(5:end,1);
