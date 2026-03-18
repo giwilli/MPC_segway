@@ -31,6 +31,7 @@ Q = 1000*eye(dim_A);
 R = 1*eye(dim_B);
 x0 = [-0.1;-0.1;-0.1;-0.1];
 y_ref = [0.0; 0.0];
+x_ref_init=[0;0;0;0];
 %% Constraints definition and Terminal Set
 
 c = [Inf; 7; pi/18; Inf];
@@ -84,7 +85,7 @@ S_tilde = S(1:end-dim_A,:);
 
 Tset = model.LQRSet;
 D_terminal = Tset.A;
-c_terminal = Tset.b;
+c_terminal = Tset.b + D_terminal*x_ref_init;
 
 D_tilde_term = [D_terminal*sys_d.A;-D_terminal*sys_d.A; zeros(1,dim_A); zeros(1,dim_A)];
 E_tilde_term = [D_terminal*sys_d.B;-D_terminal*sys_d.B; 0; 0];
