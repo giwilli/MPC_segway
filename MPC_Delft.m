@@ -85,7 +85,7 @@ S_tilde = S(1:end-dim_A,:);
 
 Tset = model.LQRSet;
 D_terminal = Tset.A;
-c_terminal = Tset.b + D_terminal*x_ref;
+c_terminal = Tset.b;
 
 D_tilde_term = [D_terminal*sys_d.A;-D_terminal*sys_d.A; zeros(1,dim_A); zeros(1,dim_A)];
 E_tilde_term = [D_terminal*sys_d.B;-D_terminal*sys_d.B; 0; 0];
@@ -133,10 +133,18 @@ h_aug = zeros(5,1);
 for i = 1:M
     disp(i);
     x0 = x_mpc(:,i);
-    % Terminal set, cost function
     [x_ref, u_ref] = OTS(y_ref,H_sel,sys_d.A,sys_d.B,sys_d.C,B_d,C_d_sys,d_hat,D,c,u_ref,200,H_aug,h_aug);
-    h = S.'*Q_bar*T*x0;
+    x_ref_bar = repmat(x_ref,N+1);
+    u_ref_bar = repmat(u_ref,N);
+    % Update of the terminal constraint
+    c_terminal = Tset.b + D_terminal*x_ref;
+    b_tilde_term = [c_terminal;c_terminal;0;0];
+    b_bar_term_temp = b_tilde_term;
+    b_bar = [b_bar_temp;b_bar_term_temp];
     g = b_bar - D_bar*T_tilde*x0;
+    % Update of the cost function
+    h = S.'*Q_bar*(T*x0-x_ref_bar) + R_bar*u_ref_bar;
+
     u = quadprog(H,h, G,g);
     u_mpc_log(:,i) = u(1,:);
     x_mpc(:,i+1) = sys_d.A*x_mpc(:,i) + sys_d.B*u(1);
