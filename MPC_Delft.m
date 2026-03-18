@@ -32,10 +32,11 @@ R = 1*eye(dim_B);
 x0 = [-0.1;-0.1;-0.1;-0.1];
 y_ref = 1;
 x_ref =[0;0;0;0];
-%% Constraints definition and Terminal Set
 
 c = [Inf; 7; pi/18; Inf];
 u_bound = 42;
+
+%% Constraints definition and Terminal Set
 
 model = LTISystem(sys_d);
 model.x.min = -c;
@@ -45,20 +46,7 @@ model.u.max = u_bound;
 
 model.x.penalty = QuadFunction(Q);
 model.u.penalty = QuadFunction(R);
-
-%% Objective function weights (Compact Form)
-
-%P = model.LQRPenalty.weight;
-P = load("P.mat");
-P = P.P;
-
-Q_bar = blkdiag(kron(eye(N),Q), P);
-R_bar = kron(eye(N),R);
-
-H = S.'*Q_bar*S + R_bar;
-H = (H+H')/2;
-
-%h = S.'*Q_bar*T*x0;
+P = model.LQRPenalty.weight;
 
 %% Compact MPC Formulation
 
@@ -84,6 +72,19 @@ b_bar_temp = repmat(b_tilde,[N,1]);
 T_tilde = T(1:end-dim_A,:);
 S_tilde = S(1:end-dim_A,:);
 
+%% Objective function weights (Compact Form)
+
+
+P = load("P.mat");
+P = P.P;
+
+Q_bar = blkdiag(kron(eye(N),Q), P);
+R_bar = kron(eye(N),R);
+
+H = S.'*Q_bar*S + R_bar;
+H = (H+H')/2;
+
+%h = S.'*Q_bar*T*x0;
 %% Terminal Constraint Formulation
 
 %Tset = model.LQRSet;
@@ -128,6 +129,10 @@ x_mpc(:,1) = x0;
 u_mpc_log = zeros(dim_B, M+1);
 u_mpc_log(:,1) = 0;
 P_Kalm =  10e6*eye(dim_A);
+Q_Kalm = 0.5*eye(dim_A);
+R_Kalm = 0.5*eye(dim_C);
+w = sqrt(Q_Kalm)*randn(dim_A,M+1);
+v = sqrt(R_Kalm)*randn(dim_C,M+1);
 x_pred = x0;
 
 H_sel = [1 0];
@@ -135,6 +140,7 @@ B_d = [0;0;0;0];
 C_d_sys = [0;0.1];
 H_aug = diag([0,0,0,0,1]);
 h_aug = zeros(5,1);
+y = sys_d.C * x0;
 
 
 [x_pred, P_Kalm] = Kalm_fn(sys_d.A, sys_d.B, sys_d.C, sys_d.D,x_pred,P_Kalm,Q_Kalm,R_Kalm,y,u_mpc_log(:,1));
@@ -143,10 +149,10 @@ for i = 1:M
     disp(i);
     x0 = x_mpc(:,i);
     [x_ref, u_ref] = OTS(y_ref,H_sel,sys_d.A,sys_d.B,sys_d.C,B_d,C_d_sys,d_hat,D,c,u_ref,200,H_aug,h_aug);
-    x_ref_bar = repmat(x_ref,N+1);
-    u_ref_bar = repmat(u_ref,N);
+    x_ref_bar = repmat(x_ref,[N+1,1]);
+    u_ref_bar = repmat(u_ref,[N,1]);
     % Update of the terminal constraint
-    c_terminal = c_terminal + D_terminal*x_ref;
+    c_terminal = Tset_b.TS_b + D_terminal*x_ref;
     b_tilde_term = [c_terminal;c_terminal;0;0];
     b_bar_term_temp = b_tilde_term;
     b_bar = [b_bar_temp;b_bar_term_temp];
@@ -176,7 +182,7 @@ end
 %% Plotting the MPC and LQR Response
 
 subplot(2,1,1); % Top plot
-plot(t, x_mpc, t, x_lqr);
+plot(t, x_mpc(1,:), t, x_lqr);
 title('State Trajectories (x)');
 legend('MPC', 'LQR');
 
