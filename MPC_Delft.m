@@ -30,8 +30,8 @@ dim_C = size(C,1);
 Q = 1000*eye(dim_A);
 R = 1*eye(dim_B);
 x0 = [-0.1;-0.1;-0.1;-0.1];
-y_ref = [0.0; 0.0];
-x_ref_init=[0;0;0;0];
+y_ref = 1;
+x_ref =[0;0;0;0];
 %% Constraints definition and Terminal Set
 
 c = [Inf; 7; pi/18; Inf];
@@ -85,7 +85,7 @@ S_tilde = S(1:end-dim_A,:);
 
 Tset = model.LQRSet;
 D_terminal = Tset.A;
-c_terminal = Tset.b + D_terminal*x_ref_init;
+c_terminal = Tset.b + D_terminal*x_ref;
 
 D_tilde_term = [D_terminal*sys_d.A;-D_terminal*sys_d.A; zeros(1,dim_A); zeros(1,dim_A)];
 E_tilde_term = [D_terminal*sys_d.B;-D_terminal*sys_d.B; 0; 0];
@@ -118,15 +118,29 @@ x_mpc = zeros(dim_A, (M+1));
 x_mpc(:,1) = x0;
 u_mpc_log = zeros(dim_B, M+1);
 u_mpc_log(:,1) = 0;
+P_Kalm =  10e6*eye(dim_A);
+x_pred = x0;
+
+H_sel = [1 0];
+B_d = [0;0;0;0];
+C_d_sys = [0;0.1];
+H_aug = diag([0,0,0,0,1]);
+h_aug = zeros(5,1);
+
+
+[x_pred, P_Kalm] = Kalm_fn(sys_d.A, sys_d.B, sys_d.C, sys_d.D,x_pred,P_Kalm,Q_Kalm,R_Kalm,y,u_mpc_log(:,1),i);
 
 for i = 1:M
     disp(i);
     x0 = x_mpc(:,i);
+    % Terminal set, cost function
+    [x_ref, u_ref] = OTS(y_ref,H_sel,sys_d.A,sys_d.B,sys_d.C,B_d,C_d_sys,d_hat,D,c,u_ref,200,H_aug,h_aug);
     h = S.'*Q_bar*T*x0;
     g = b_bar - D_bar*T_tilde*x0;
     u = quadprog(H,h, G,g);
     u_mpc_log(:,i) = u(1,:);
     x_mpc(:,i+1) = sys_d.A*x_mpc(:,i) + sys_d.B*u(1);
+    [x_pred, P_Kalm] = Kalm_fn(sys_d.A, sys_d.B, sys_d.C, sys_d.D,x_pred,P_Kalm,Q_Kalm,R_Kalm,y,u(1));
 end
 %% LQR for reference
 
