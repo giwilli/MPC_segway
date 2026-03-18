@@ -32,6 +32,7 @@ R = 1*eye(dim_B);
 x0 = [-0.1;-0.1;-0.1;-0.1];
 y_ref = 1;
 x_ref =[0;0;0;0];
+u_ref =0;
 
 c = [Inf; 7; pi/18; Inf];
 u_bound = 42;
@@ -128,27 +129,34 @@ x_mpc = zeros(dim_A, (M+1));
 x_mpc(:,1) = x0;
 u_mpc_log = zeros(dim_B, M+1);
 u_mpc_log(:,1) = 0;
-P_Kalm =  10e6*eye(dim_A);
-Q_Kalm = 0.5*eye(dim_A);
+n_d = 1;
+
+d = 1;
+
+P_Kalm =  10e6*eye(dim_A+n_d);
+Q_Kalm = 0.5*eye(dim_A+n_d);
 R_Kalm = 0.5*eye(dim_C);
-w = sqrt(Q_Kalm)*randn(dim_A,M+1);
+w = sqrt(Q_Kalm)*randn(dim_A+n_d,M+1);
 v = sqrt(R_Kalm)*randn(dim_C,M+1);
-x_pred = x0;
+x_pred = [x0;zeros(n_d)];
+A_kalm = [sys_d.A B_d; zeros(n_d,dim_A) eye(n_d)];
+B_kalm = [sys_d.B; zeros(n_d)];
+C_kalm = [sys_d.C, C_d_sys];
 
 H_sel = [1 0];
 B_d = [0;0;0;0];
 C_d_sys = [0;0.1];
 H_aug = diag([0,0,0,0,1]);
 h_aug = zeros(5,1);
-y = sys_d.C * x0;
+y = sys_d.C * x0 + C_d_sys*d + v(:,1);
 
 
-[x_pred, P_Kalm] = Kalm_fn(sys_d.A, sys_d.B, sys_d.C, sys_d.D,x_pred,P_Kalm,Q_Kalm,R_Kalm,y,u_mpc_log(:,1));
-
+[x_pred, P_Kalm] = Kalm_fn(A_kalm, B_kalm, C_kalm, sys_d.D,x_pred,P_Kalm,Q_Kalm,R_Kalm,y,u_mpc_log(:,1));
+d_hat = x_pred(end-n_d+1:end);
 for i = 1:M
     disp(i);
     x0 = x_mpc(:,i);
-    [x_ref, u_ref] = OTS(y_ref,H_sel,sys_d.A,sys_d.B,sys_d.C,B_d,C_d_sys,d_hat,D,c,u_ref,200,H_aug,h_aug);
+    [x_ref, u_ref] = OTS(y_ref,H_sel,sys_d.A,sys_d.B,sys_d.C,B_d,C_d_sys,d_hat,D,c,u_bound,200,H_aug,h_aug);
     x_ref_bar = repmat(x_ref,[N+1,1]);
     u_ref_bar = repmat(u_ref,[N,1]);
     % Update of the terminal constraint
@@ -158,12 +166,14 @@ for i = 1:M
     b_bar = [b_bar_temp;b_bar_term_temp];
     g = b_bar - D_bar*T_tilde*x0;
     % Update of the cost function
-    h = S.'*Q_bar*(T*x0-x_ref_bar) + R_bar*u_ref_bar;
+    h = S.'*Q_bar*(T*x0-x_ref_bar) - R_bar*u_ref_bar;
 
     u = quadprog(H,h, G,g);
     u_mpc_log(:,i) = u(1,:);
-    x_mpc(:,i+1) = sys_d.A*x_mpc(:,i) + sys_d.B*u(1);
-    [x_pred, P_Kalm] = Kalm_fn(sys_d.A, sys_d.B, sys_d.C, sys_d.D,x_pred,P_Kalm,Q_Kalm,R_Kalm,y,u(1));
+    x_mpc(:,i+1) = sys_d.A*x_mpc(:,i) + sys_d.B*u(1) + B_d*d+ w(1:end-n_d,i);
+    y = sys_d.C * x_mpc(:,i) + C_d_sys*d + v(:,i);
+    [x_pred, P_Kalm] = Kalm_fn(A_kalm, B_kalm, C_kalm, sys_d.D,x_pred,P_Kalm,Q_Kalm,R_Kalm,y,u_mpc_log(:,1));
+    d_hat = x_pred(end-n_d+1:end);
 end
 %% LQR for reference
 
