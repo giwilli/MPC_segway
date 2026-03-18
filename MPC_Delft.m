@@ -83,7 +83,9 @@ S_tilde = S(1:end-dim_A,:);
 
 %% Terminal Constraint Formulation
 
-Tset = model.LQRSet;
+%Tset = model.LQRSet;
+Tset = load("TS.mat");
+Tset = Tset.Tset;
 D_terminal = Tset.A;
 c_terminal = Tset.b;
 
