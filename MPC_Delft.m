@@ -30,7 +30,7 @@ dim_C = size(C,1);
 Q = 1000*eye(dim_A);
 R = 1*eye(dim_B);
 x0 = [-0.1;-0.1;-0.1;-0.1];
-y_ref = 1;
+y_ref = 0;
 x_ref =[0;0;0;0];
 u_ref =0;
 
@@ -98,9 +98,9 @@ Tset_b = load("TS_b.mat");
 D_terminal = Tset_A.TS_A;
 c_terminal = Tset_b.TS_b;
 
-D_tilde_term = [D_terminal*sys_d.A;-D_terminal*sys_d.A; zeros(1,dim_A); zeros(1,dim_A)];
-E_tilde_term = [D_terminal*sys_d.B;-D_terminal*sys_d.B; 0; 0];
-b_tilde_term = [c_terminal;c_terminal;0;0];
+D_tilde_term = [D_terminal*sys_d.A];   %;-D_terminal*sys_d.A; zeros(1,dim_A); zeros(1,dim_A)];
+E_tilde_term = [D_terminal*sys_d.B];   %;-D_terminal*sys_d.B; 0; 0];
+b_tilde_term = [c_terminal];           %;c_terminal;0;0];
 
 tmp = zeros(1,N);
 tmp(:,end) = 1;
@@ -125,55 +125,75 @@ t = 0:0.01:M*0.01;
 
 %% Closed Loop MPC
 
+x0 = [0;0;0;0];
+y_ref = 1;
 x_mpc = zeros(dim_A, (M+1));
+y_mpc = zeros(dim_C, (M+1));
 x_mpc(:,1) = x0;
+y_mpc(:,1) = 0;
 u_mpc_log = zeros(dim_B, M+1);
 u_mpc_log(:,1) = 0;
 n_d = 1;
 
-d = 1;
+d = 0.01;
 
-P_Kalm =  10e6*eye(dim_A+n_d);
-Q_Kalm = 0.5*eye(dim_A+n_d);
-R_Kalm = 0.5*eye(dim_C);
+P_Kalm =  (1)*eye(dim_A+n_d);
+Q_Kalm = 0.000000005*eye(dim_A+n_d);
+R_Kalm = 0.0005*eye(dim_C);
+
 w = sqrt(Q_Kalm)*randn(dim_A+n_d,M+1);
 v = sqrt(R_Kalm)*randn(dim_C,M+1);
-x_pred = [x0;zeros(n_d)];
-A_kalm = [sys_d.A B_d; zeros(n_d,dim_A) eye(n_d)];
-B_kalm = [sys_d.B; zeros(n_d)];
-C_kalm = [sys_d.C, C_d_sys];
+
+plot(w)
+
+x_pred = zeros(n_d + dim_A,1);
 
 H_sel = [1 0];
 B_d = [0;0;0;0];
 C_d_sys = [0;0.1];
 H_aug = diag([0,0,0,0,1]);
 h_aug = zeros(5,1);
-y = sys_d.C * x0 + C_d_sys*d + v(:,1);
+
+%y = sys_d.C * x0 + C_d_sys*d + v(:,1);
+
+A_kalm = [sys_d.A B_d; zeros(n_d,dim_A) eye(n_d)];
+B_kalm = [sys_d.B; zeros(n_d)];
+C_kalm = [sys_d.C, C_d_sys];
 
 
-[x_pred, P_Kalm] = Kalm_fn(A_kalm, B_kalm, C_kalm, sys_d.D,x_pred,P_Kalm,Q_Kalm,R_Kalm,y,u_mpc_log(:,1));
-d_hat = x_pred(end-n_d+1:end);
+%[x_pred, P_Kalm] = Kalm_fn(A_kalm, B_kalm, C_kalm, sys_d.D, x_pred,P_Kalm,Q_Kalm,R_Kalm,y,u_mpc_log(:,1));
+%d_hat = x_pred(end-n_d+1:end);
+
 for i = 1:M
-    disp(i);
-    x0 = x_mpc(:,i);
+    disp(i)
+    x0 = x_pred(1:4)
+    d_hat = x_pred(end,1);
+
+    % OTS
     [x_ref, u_ref] = OTS(y_ref,H_sel,sys_d.A,sys_d.B,sys_d.C,B_d,C_d_sys,d_hat,D,c,u_bound,200,H_aug,h_aug);
     x_ref_bar = repmat(x_ref,[N+1,1]);
     u_ref_bar = repmat(u_ref,[N,1]);
+    
     % Update of the terminal constraint
     c_terminal = Tset_b.TS_b + D_terminal*x_ref;
-    b_tilde_term = [c_terminal;c_terminal;0;0];
+    b_tilde_term = c_terminal;
     b_bar_term_temp = b_tilde_term;
     b_bar = [b_bar_temp;b_bar_term_temp];
     g = b_bar - D_bar*T_tilde*x0;
+    
     % Update of the cost function
     h = S.'*Q_bar*(T*x0-x_ref_bar) - R_bar*u_ref_bar;
 
+    % MPC solve
     u = quadprog(H,h, G,g);
     u_mpc_log(:,i) = u(1,:);
-    x_mpc(:,i+1) = sys_d.A*x_mpc(:,i) + sys_d.B*u(1) + B_d*d+ w(1:end-n_d,i);
+
+    x_mpc(:,i+1) = sys_d.A*x_mpc(:,i) + sys_d.B*u(1) + B_d*d + w(1:end-n_d,i);
     y = sys_d.C * x_mpc(:,i) + C_d_sys*d + v(:,i);
-    [x_pred, P_Kalm] = Kalm_fn(A_kalm, B_kalm, C_kalm, sys_d.D,x_pred,P_Kalm,Q_Kalm,R_Kalm,y,u_mpc_log(:,1));
-    d_hat = x_pred(end-n_d+1:end);
+    y_mpc(:,i) = y;
+    
+    [x_pred, P_Kalm] = Kalm_fn(A_kalm, B_kalm, C_kalm, sys_d.D,x_pred,P_Kalm,Q_Kalm,R_Kalm,y,u(1));
+    %x_pred = [x_mpc(:,i+1);d];
 end
 %% LQR for reference
 
@@ -192,10 +212,13 @@ end
 %% Plotting the MPC and LQR Response
 
 subplot(2,1,1); % Top plot
-plot(t, x_mpc(1,:), t, x_lqr);
+plot(t, y_mpc(1,:))
+%plot(t, x_mpc(1,:))
+%plot(t, x_mpc(1,:), t, x_lqr);
 title('State Trajectories (x)');
 legend('MPC', 'LQR');
 
+%%
 subplot(2,1,2); % Bottom plot
 plot(t, u_mpc_log, t, u_lqr_log);
 title('Control Inputs (u)');
@@ -239,8 +262,8 @@ ub = [];
 x0 = [];
 state_aug = quadprog(H_aug, h_aug, F_aug, f_aug, A_aug, b_aug,lb,ub,x0, options);
 
-x_ref = state_aug(1:4,1)
-u_ref = state_aug(5:end,1)
+x_ref = state_aug(1:4,1);
+u_ref = state_aug(5:end,1);
 
 %%
 [x_ref_fn,u_ref_fn] = OTS(y_ref,H_sel,sys_d.A,sys_d.B,sys_d.C,B_d,C_d_sys,d_hat,D,c,u_ref,200,H_aug,h_aug)
