@@ -1,15 +1,17 @@
 %% Cleanup and initialize
-
-clc;
-tbxmanager restorepath;
-mpt_init;
-
-%% Global Solver option
-global mptOptions
-mptOptions.verbose = 1;
+% 
+% clc;
+% tbxmanager restorepath;
+% mpt_init;
+% 
+% %% Global Solver option
+% global mptOptions
+% mptOptions.verbose = 1;
 
 %% Create the discretized system
-
+clear all;
+clc;
+Equations;
 A = A_lin_s;
 B = B_lin_s;
 C = C_lin_s;
@@ -29,25 +31,21 @@ dim_B = size(B,2);
 dim_C = size(C,1);
 Q = 1000*eye(dim_A);
 R = 1*eye(dim_B);
-x0 = [-0.1;-0.1;-0.1;-0.1];
-y_ref = 0;
-x_ref =[0;0;0;0];
-u_ref =0;
 
 c = [Inf; 7; pi/18; Inf];
 u_bound = 42;
 
 %% Constraints definition and Terminal Set
 
-model = LTISystem(sys_d);
-model.x.min = -c;
-model.x.max = c;
-model.u.min = -u_bound;
-model.u.max = u_bound;
-
-model.x.penalty = QuadFunction(Q);
-model.u.penalty = QuadFunction(R);
-P = model.LQRPenalty.weight;
+% model = LTISystem(sys_d);
+% model.x.min = -c;
+% model.x.max = c;
+% model.u.min = -u_bound;
+% model.u.max = u_bound;
+% 
+% model.x.penalty = QuadFunction(Q);
+% model.u.penalty = QuadFunction(R);
+% P = model.LQRPenalty.weight;
 
 %% Compact MPC Formulation
 
@@ -109,6 +107,7 @@ E_bar_term_temp = kron(tmp,E_tilde_term);
 b_bar_term_temp = b_tilde_term;
 
 %% Constraint Concatination
+x0 = [0;0;0;0];
 
 D_bar = [D_bar_temp;D_bar_term_temp];
 E_bar = [E_bar_temp;E_bar_term_temp];
@@ -120,13 +119,13 @@ g = b_bar - D_bar*T_tilde*x0;
 
 %% Closed Loop global paramters
 
-M = 1000;
+M = 600;
 t = 0:Ts:M*Ts;
-
+y_ref_final = 1;
+y_plateau = ones(1,M)* y_ref_final;
+y_ref = y_plateau;%[linspace(0,y_ref_final,M)];
 %% Closed Loop MPC
 
-x0 = [0;0;0;0];
-y_ref = 1;
 x_mpc = zeros(dim_A, (M+1));
 y_mpc = zeros(dim_C, (M+1));
 x_mpc(:,1) = x0;
@@ -136,23 +135,28 @@ u_mpc_log(:,1) = 0;
 n_d = 1;
 
 kalman_log = zeros(dim_A+n_d, (M+1));
+x_ref_normlog = zeros(dim_A, (M+1));
 
-d = 0.1;
+d = 0.01;
 
-P_Kalm =  (1)*eye(dim_A+n_d);
-Q_Kalm = 0.0000000005*eye(dim_A+n_d);
-R_Kalm = 0.0005*eye(dim_C);
+q_std = 0.00001;
+pos_std = 0.002;
+angv_std = 0.02;
+
+P_Kalm =  (1e-3)*eye(dim_A+n_d);
+Q_Kalm = q_std^2*eye(dim_A+n_d);
+R_Kalm = diag([pos_std^2,angv_std^2]);
 
 w = sqrt(Q_Kalm)*randn(dim_A+n_d,M+1);
 v = sqrt(R_Kalm)*randn(dim_C,M+1);
 
 %plot(w)
 
-x_pred = zeros(n_d + dim_A,1);
+x_pred = [zeros(dim_A,1); zeros(n_d)];
 
 H_sel = [1 0];
 B_d = [0;0;0;0];
-C_d_sys = [0;0.1];
+C_d_sys = [0;1];
 H_aug = diag([0,0,0,0,1]);
 h_aug = zeros(5,1);
 
@@ -172,9 +176,10 @@ for i = 1:M
     d_hat = x_pred(end,1);
 
     % OTS
-    [x_ref, u_ref] = OTS(y_ref,H_sel,sys_d.A,sys_d.B,sys_d.C,B_d,C_d_sys,d_hat,D,c,u_bound,200,H_aug,h_aug);
+    [x_ref, u_ref] = OTS(y_ref(i),H_sel,sys_d.A,sys_d.B,sys_d.C,B_d,C_d_sys,d_hat,D,c,u_bound,200,H_aug,h_aug);
     x_ref_bar = repmat(x_ref,[N+1,1]);
     u_ref_bar = repmat(u_ref,[N,1]);
+    x_ref_normlog(:,i) = norm(x0 - x_ref);
     
     % Update of the terminal constraint
     c_terminal = Tset_b.TS_b + D_terminal*x_ref;
@@ -185,8 +190,6 @@ for i = 1:M
     
     % Update of the cost function
     h = S.'*Q_bar*(T*x0-x_ref_bar) - R_bar*u_ref_bar;
-
-    % MPC solve
     u = quadprog(H,h, G,g);
     u_mpc_log(:,i) = u(1,:);
 
@@ -200,82 +203,84 @@ for i = 1:M
 end
 %% LQR for reference
 
-[K,S,P] = lqr(sys_d,Q,R);
-x_lqr = zeros(dim_A, (M+1));
-x_lqr(:,1) = x0;
-u_lqr_log = zeros(dim_B, M+1);
-u_lqr_log(:,1) = 0;
-
-for i = 1:M
-    %disp(i);
-    u = -K*x_lqr(:,i);
-    x_lqr(:,i+1) = (sys_d.A*x_lqr(:,i) + sys_d.B*u);
-    u_lqr_log(:,i) = u;
-end
+% [K,S,P] = lqr(sys_d,Q,R);
+% x_lqr = zeros(dim_A, (M+1));
+% x_lqr(:,1) = x0;
+% u_lqr_log = zeros(dim_B, M+1);
+% u_lqr_log(:,1) = 0;
+% 
+% for i = 1:M
+%     %disp(i);
+%     u = -K*x_lqr(:,i);
+%     x_lqr(:,i+1) = (sys_d.A*x_lqr(:,i) + sys_d.B*u);
+%     u_lqr_log(:,i) = u;
+% end
 %% Plotting the MPC and LQR Response
 
-subplot(3,1,1); % Top plot
+subplot(4,1,1); % Top plot
 plot(t, y_mpc(1,:))
-subplot(3,1,2);
+subplot(4,1,2);
 hold on
 plot(t,kalman_log(1,:))
 plot(t,x_mpc(1,:))
-subplot(3,1,3);
+subplot(4,1,3);
 plot(t,kalman_log(5,:))
+subplot(4,1,4);
+plot(t,x_ref_normlog)
 %plot(t, x_mpc(1,:))
 %plot(t, x_mpc(1,:), t, x_lqr);
 title('State Trajectories (x)');
-legend('MPC', 'LQR');
+legend('norm');
 
 %%
-subplot(2,1,2); % Bottom plot
-plot(t, u_mpc_log, t, u_lqr_log);
-title('Control Inputs (u)');
-legend('MPC', 'LQR');
-
-%% OTS
-H_sel = [1 0];
-dim_HC = size(H_sel*sys_d.C,1);
-A_aug = [(eye(dim_A)-sys_d.A) -sys_d.B;
-        H_sel*sys_d.C zeros(dim_HC,dim_B)];
-%det(A_aug);
-d_hat = 0;
-y_ref = 1;
-B_d = [0;0;0;0];
-C_d_sys = [0;0.1];
-HC_d = H_sel*C_d_sys;
-b_aug = [B_d*d_hat;(y_ref - HC_d*d_hat)];
-
-% sys_d.C;
-% A_distrej = [(eye(dim_A)-sys_d.A) -sys_d.B;
-%         H_sel*sys_d.C C_d];
+% subplot(2,1,2); % Bottom plot
+% plot(t, u_mpc_log, t, u_lqr_log);
+% title('Control Inputs (u)');
+% legend('MPC', 'LQR');
 % 
-% rank(A_distrej)
-% rank(A_aug)
-
-D = diag([1 1 1 1]);
-c = [1000; 7; pi/18; 1000];
-u_bound = 42;
-f = [c; u_bound];
-D_aug = [D; zeros(dim_B, dim_A)];
-E_aug = [zeros(dim_A,dim_B); ones(dim_B)];
-F_aug = [D_aug, E_aug;-D_aug, -E_aug];
-f_aug = [f; f];
-
-H_aug = diag([0,0,0,0,1]);%eye(5);%
-h_aug = zeros(5,1);
-
-options = optimoptions('quadprog', 'MaxIterations', 200);
-lb = [];
-ub = [];
-x0 = [];
-state_aug = quadprog(H_aug, h_aug, F_aug, f_aug, A_aug, b_aug,lb,ub,x0, options);
-
-x_ref = state_aug(1:4,1);
-u_ref = state_aug(5:end,1);
-
-%%
-[x_ref_fn,u_ref_fn] = OTS(y_ref,H_sel,sys_d.A,sys_d.B,sys_d.C,B_d,C_d_sys,d_hat,D,c,u_ref,200,H_aug,h_aug)
-% Define the constraints for x_ref and u_ref
-% Define the constraints for y_ref
-% Solve the Optimal Control Problem
+% %% OTS
+% H_sel = [1 0];
+% dim_HC = size(H_sel*sys_d.C,1);
+% A_aug = [(eye(dim_A)-sys_d.A) -sys_d.B;
+%         H_sel*sys_d.C zeros(dim_HC,dim_B)];
+% %det(A_aug);
+% d_hat = 0;
+% y_ref = 1;
+% B_d = [0;0;0;0];
+% C_d_sys = [0;0.1];
+% HC_d = H_sel*C_d_sys;
+% b_aug = [B_d*d_hat;(y_ref - HC_d*d_hat)];
+% 
+% % sys_d.C;
+% % A_distrej = [(eye(dim_A)-sys_d.A) -sys_d.B;
+% %         H_sel*sys_d.C C_d];
+% % 
+% % rank(A_distrej)
+% % rank(A_aug)
+% 
+% D = diag([1 1 1 1]);
+% c = [1000; 7; pi/18; 1000];
+% u_bound = 42;
+% f = [c; u_bound];
+% D_aug = [D; zeros(dim_B, dim_A)];
+% E_aug = [zeros(dim_A,dim_B); ones(dim_B)];
+% F_aug = [D_aug, E_aug;-D_aug, -E_aug];
+% f_aug = [f; f];
+% 
+% H_aug = diag([0,0,0,0,1]);%eye(5);%
+% h_aug = zeros(5,1);
+% 
+% options = optimoptions('quadprog', 'MaxIterations', 200);
+% lb = [];
+% ub = [];
+% x0 = [];
+% state_aug = quadprog(H_aug, h_aug, F_aug, f_aug, A_aug, b_aug,lb,ub,x0, options);
+% 
+% x_ref = state_aug(1:4,1);
+% u_ref = state_aug(5:end,1);
+% 
+% %%
+% [x_ref_fn,u_ref_fn] = OTS(y_ref,H_sel,sys_d.A,sys_d.B,sys_d.C,B_d,C_d_sys,d_hat,D,c,u_ref,200,H_aug,h_aug)
+% % Define the constraints for x_ref and u_ref
+% % Define the constraints for y_ref
+% % Solve the Optimal Control Problem
