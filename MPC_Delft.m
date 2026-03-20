@@ -10,6 +10,7 @@
 
 %% Create the discretized system
 clear all;
+close all;
 clc;
 Equations;
 A = A_lin_s;
@@ -122,8 +123,10 @@ g = b_bar - D_bar*T_tilde*x0;
 M = 600;
 t = 0:Ts:M*Ts;
 y_ref_final = 1;
-y_plateau = ones(1,M)* y_ref_final;
-y_ref = y_plateau;%[linspace(0,y_ref_final,M)];
+y_constant = ones(1,M+1)* y_ref_final;
+y_square = square (pi*t/10);
+y_linear = linspace(0,y_ref_final,M);
+y_ref = y_constant;%[linspace(0,y_ref_final,M)];
 %% Closed Loop MPC
 
 x_mpc = zeros(dim_A, (M+1));
@@ -141,11 +144,12 @@ d = 0.01;
 
 q_std = 0.00001;
 pos_std = 0.002;
+vel_std = 0.002;
 angv_std = 0.02;
 
 P_Kalm =  (1e-3)*eye(dim_A+n_d);
 Q_Kalm = q_std^2*eye(dim_A+n_d);
-R_Kalm = diag([pos_std^2,angv_std^2]);
+R_Kalm = diag([pos_std^2 vel_std^2 angv_std^2]);
 
 w = sqrt(Q_Kalm)*randn(dim_A+n_d,M+1);
 v = sqrt(R_Kalm)*randn(dim_C,M+1);
@@ -154,9 +158,9 @@ v = sqrt(R_Kalm)*randn(dim_C,M+1);
 
 x_pred = [zeros(dim_A,1); zeros(n_d)];
 
-H_sel = [1 0];
+H_sel = [1 0 0];
 B_d = [0;0;0;0];
-C_d_sys = [0;1];
+C_d_sys = [0;0;1];
 H_aug = diag([0,0,0,0,1]);
 h_aug = zeros(5,1);
 
@@ -226,11 +230,11 @@ plot(t,x_mpc(1,:))
 subplot(4,1,3);
 plot(t,kalman_log(5,:))
 subplot(4,1,4);
-plot(t,x_ref_normlog)
+plot(t,y_ref)
 %plot(t, x_mpc(1,:))
 %plot(t, x_mpc(1,:), t, x_lqr);
 title('State Trajectories (x)');
-legend('norm');
+legend('Reference');
 
 %%
 % subplot(2,1,2); % Bottom plot

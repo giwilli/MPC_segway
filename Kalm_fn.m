@@ -1,5 +1,5 @@
 function [x_pred,P_Kalm] = Kalm_fn(A_sys, B_sys, C_sys, D_sys, x_prev_pred,P,Q,R,y_prev,u_prev)
-%UNTITLED2 Kalman filter
+%KALMAN_FILTER
 %   Implementation of the Kalman filter for the OTS
 A = A_sys;
 B = B_sys;
