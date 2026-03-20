@@ -23,7 +23,7 @@ rank(obsv(sys_d.A, sys_d.C))
 
 %% Problem Fundamentals
 
-N = 70;
+N = 100;
 dim_A = size(A,1);
 dim_B = size(B,2);
 dim_C = size(C,1);
@@ -51,7 +51,7 @@ P = model.LQRPenalty.weight;
 
 %% Compact MPC Formulation
 
-T = zeros(dim_A*(N+1),dim_A);
+T = zeros(dim_A*(N+1),dim_A); 
 S = zeros(dim_A*(N+1), dim_B*N);
 
 
@@ -121,7 +121,7 @@ g = b_bar - D_bar*T_tilde*x0;
 %% Closed Loop global paramters
 
 M = 1000;
-t = 0:0.01:M*0.01;
+t = 0:Ts:M*Ts;
 
 %% Closed Loop MPC
 
@@ -135,16 +135,18 @@ u_mpc_log = zeros(dim_B, M+1);
 u_mpc_log(:,1) = 0;
 n_d = 1;
 
-d = 0.01;
+kalman_log = zeros(dim_A+n_d, (M+1));
+
+d = 0.1;
 
 P_Kalm =  (1)*eye(dim_A+n_d);
-Q_Kalm = 0.000000005*eye(dim_A+n_d);
+Q_Kalm = 0.0000000005*eye(dim_A+n_d);
 R_Kalm = 0.0005*eye(dim_C);
 
 w = sqrt(Q_Kalm)*randn(dim_A+n_d,M+1);
 v = sqrt(R_Kalm)*randn(dim_C,M+1);
 
-plot(w)
+%plot(w)
 
 x_pred = zeros(n_d + dim_A,1);
 
@@ -166,7 +168,7 @@ C_kalm = [sys_d.C, C_d_sys];
 
 for i = 1:M
     disp(i)
-    x0 = x_pred(1:4)
+    x0 = x_pred(1:4);
     d_hat = x_pred(end,1);
 
     % OTS
@@ -189,11 +191,12 @@ for i = 1:M
     u_mpc_log(:,i) = u(1,:);
 
     x_mpc(:,i+1) = sys_d.A*x_mpc(:,i) + sys_d.B*u(1) + B_d*d + w(1:end-n_d,i);
-    y = sys_d.C * x_mpc(:,i) + C_d_sys*d + v(:,i);
+    y = sys_d.C * x_mpc(:,i) + C_d_sys*d+ v(:,i);
     y_mpc(:,i) = y;
     
     [x_pred, P_Kalm] = Kalm_fn(A_kalm, B_kalm, C_kalm, sys_d.D,x_pred,P_Kalm,Q_Kalm,R_Kalm,y,u(1));
     %x_pred = [x_mpc(:,i+1);d];
+    kalman_log(:,i) = x_pred;
 end
 %% LQR for reference
 
@@ -211,8 +214,14 @@ for i = 1:M
 end
 %% Plotting the MPC and LQR Response
 
-subplot(2,1,1); % Top plot
+subplot(3,1,1); % Top plot
 plot(t, y_mpc(1,:))
+subplot(3,1,2);
+hold on
+plot(t,kalman_log(1,:))
+plot(t,x_mpc(1,:))
+subplot(3,1,3);
+plot(t,kalman_log(5,:))
 %plot(t, x_mpc(1,:))
 %plot(t, x_mpc(1,:), t, x_lqr);
 title('State Trajectories (x)');
