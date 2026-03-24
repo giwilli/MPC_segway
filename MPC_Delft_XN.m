@@ -26,7 +26,7 @@ rank(obsv(sys_d.A, sys_d.C))
 
 %% Problem Fundamentals
 
-N = 100;
+N = 25;
 dim_A = size(A,1);
 dim_B = size(B,2);
 dim_C = size(C,1);
@@ -174,7 +174,7 @@ y_ref = y_constant;%[linspace(0,y_ref_final,M)];
 bnd_r = 6.5;
 bnd_s = pi/18;
 r = 1;
-res = 50;
+res = 25;
 mat_plot = zeros(res,res);
 disp('Calculating: ')
 % loop through different initial conditions 
@@ -206,21 +206,22 @@ figure(2);
 hold on;
 
 r = 1;
+m_size = 11;
 for r_plot = linspace(-bnd_r,bnd_r,res)
     s = 1;
     disp(r)
     for s_plot = linspace(-bnd_s,bnd_s,res)
         if (mat_plot(r,s) == 1)
-            plot(r_plot,s_plot,'sg','MarkerFaceColor','b','MarkerEdgeColor','b','MarkerSize',8);
+            plot(r_plot,s_plot,'sg','MarkerFaceColor','g','MarkerEdgeColor','g','MarkerSize',m_size);
         else
-            plot(r_plot,s_plot,'sr','MarkerFaceColor','k','MarkerEdgeColor','k','MarkerSize',8);
+            plot(r_plot,s_plot,'sr','MarkerFaceColor','w','MarkerEdgeColor','w','MarkerSize',m_size);
         end
         s = s+1;
     end
     r = r+1;
 end
-xlabel('x');
-ylabel('$\dot{x}$','interpreter','latex');
+xlabel('x [m]', 'interpreter','latex');
+ylabel('$\varphi$ [rad]','interpreter','latex');
 grid on;
 xlim([-1.05*bnd_r 1.05*bnd_r]);
 ylim([-1.05*bnd_s 1.05*bnd_s]);
