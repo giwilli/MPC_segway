@@ -108,7 +108,7 @@ E_bar_term_temp = kron(tmp,E_tilde_term);
 b_bar_term_temp = b_tilde_term;
 
 %% Constraint Concatination
-x0 = [1;0;0;0];
+x0 = [0;0;0;0];
 
 D_bar = [D_bar_temp;D_bar_term_temp];
 E_bar = [E_bar_temp;E_bar_term_temp];
@@ -120,7 +120,7 @@ g = b_bar - D_bar*T_tilde*x0;
 
 %% Closed Loop global paramters
 
-sim_sec = 6;
+sim_sec = 10;
 t = 0:Ts:sim_sec;
 M = sim_sec/Ts;
 y_ref_final = 1;
@@ -130,7 +130,7 @@ y_square = square (pi*t/10);
 y_linear = linspace(0,y_ref_final,M);
 
 %Reference given to the controller
-y_ref = y_reg;%[linspace(0,y_ref_final,M)];
+y_ref = y_constant;%[linspace(0,y_ref_final,M)];
 %% Closed Loop MPC
 
 x_mpc = zeros(dim_A, (M+1));
@@ -225,20 +225,36 @@ end
 % end
 %% Plotting the MPC and LQR Response
 
-subplot(4,1,1); % Top plot
+max_overshoot = 0.1*y_ref_final;
+ss_error = 0.02 *y_ref_final;
+
+subplot(1,1,1); % Top plot
 plot(t, y_mpc(1,:))
-subplot(4,1,2);
-hold on
-plot(t,kalman_log(1,:))
-plot(t,x_mpc(1,:))
-subplot(4,1,3);
-plot(t,kalman_log(5,:))
-subplot(4,1,4);
-plot(t,y_ref)
-%plot(t, x_mpc(1,:))
-%plot(t, x_mpc(1,:), t, x_lqr);
-title('State Trajectories (x)');
-legend('Reference');
+title('Output');
+legend('Baseline');
+ylabel('$y$ [m]','interpreter','latex');
+xlabel('$t$ [s]','interpreter','latex');
+
+xlim([0, 10]);
+ylim([-0.2, 1.2]);
+
+% (Optional) Adding '--r' makes them dashed red lines for better visibility
+yline(ss_error + y_ref_final, '--r', 'HandleVisibility', 'off'); 
+yline(-ss_error + y_ref_final, '--r', 'HandleVisibility', 'off');
+yline(max_overshoot + y_ref_final, '--k', 'HandleVisibility', 'off');
+
+grid on
+% hold on
+% plot(t,kalman_log(1,:))
+% plot(t,x_mpc(1,:))
+% subplot(4,1,3);
+% plot(t,kalman_log(5,:))
+% subplot(4,1,4);
+% plot(t,y_ref)
+% %plot(t, x_mpc(1,:))
+% %plot(t, x_mpc(1,:), t, x_lqr);
+% title('State Trajectories (x)');
+% legend('Reference');
 
 %%
 % subplot(2,1,2); % Bottom plot
