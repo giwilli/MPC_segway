@@ -26,7 +26,7 @@ rank(obsv(sys_d.A, sys_d.C))
 
 %% Problem Fundamentals
 
-N = 100;
+N = 75;
 dim_A = size(A,1);
 dim_B = size(B,2);
 dim_C = size(C,1);
@@ -108,7 +108,7 @@ E_bar_term_temp = kron(tmp,E_tilde_term);
 b_bar_term_temp = b_tilde_term;
 
 %% Constraint Concatination
-x0 = [0;0;0;0];
+x0 = [1;0;0;0];
 
 D_bar = [D_bar_temp;D_bar_term_temp];
 E_bar = [E_bar_temp;E_bar_term_temp];
@@ -120,13 +120,17 @@ g = b_bar - D_bar*T_tilde*x0;
 
 %% Closed Loop global paramters
 
-M = 600;
-t = 0:Ts:M*Ts;
+sim_sec = 6;
+t = 0:Ts:sim_sec;
+M = sim_sec/Ts;
 y_ref_final = 1;
+y_reg = zeros(1,M+1);
 y_constant = ones(1,M+1)* y_ref_final;
 y_square = square (pi*t/10);
 y_linear = linspace(0,y_ref_final,M);
-y_ref = y_constant;%[linspace(0,y_ref_final,M)];
+
+%Reference given to the controller
+y_ref = y_reg;%[linspace(0,y_ref_final,M)];
 %% Closed Loop MPC
 
 x_mpc = zeros(dim_A, (M+1));
