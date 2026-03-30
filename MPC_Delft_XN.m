@@ -1,12 +1,15 @@
 %% Cleanup and initialize
-% 
-% clc;
-% tbxmanager restorepath;
-% mpt_init;
-% 
-% %% Global Solver option
-% global mptOptions
-% mptOptions.verbose = 1;
+
+clc;
+tbxmanager restorepath;
+mpt_init;
+
+%% Global Solver option
+global MPTOPTIONS
+MPTOPTIONS.modules.geometry.sets.Polyhedron.projection.method = 'mplp';
+global mptOptions
+mptOptions.verbose = 1;
+mptOptions.infbound = 500; % Increase from the default 100
 
 %% Create the discretized system
 clear all;
@@ -26,7 +29,7 @@ rank(obsv(sys_d.A, sys_d.C))
 
 %% Problem Fundamentals
 
-N = 25;
+N = 2;
 dim_A = size(A,1);
 dim_B = size(B,2);
 dim_C = size(C,1);
@@ -38,15 +41,15 @@ u_bound = 42;
 
 %% Constraints definition and Terminal Set
 
-% model = LTISystem(sys_d);
-% model.x.min = -c;
-% model.x.max = c;
-% model.u.min = -u_bound;
-% model.u.max = u_bound;
-% 
-% model.x.penalty = QuadFunction(Q);
-% model.u.penalty = QuadFunction(R);
-% P = model.LQRPenalty.weight;
+model = LTISystem(sys_d);
+model.x.min = -c;
+model.x.max = c;
+model.u.min = -u_bound;
+model.u.max = u_bound;
+
+model.x.penalty = QuadFunction(Q);
+model.u.penalty = QuadFunction(R);
+P = model.LQRPenalty.weight;
 
 %% Compact MPC Formulation
 
@@ -87,15 +90,15 @@ H = (H+H')/2;
 %h = S.'*Q_bar*T*x0;
 %% Terminal Constraint Formulation
 
-%Tset = model.LQRSet;
-%D_terminal = Tset.A;
-%c_terminal = Tset.b;
+Tset = model.LQRSet;
+D_terminal = Tset.A;
+c_terminal = Tset.b;
 
-Tset_A = load("TS_A.mat");
-Tset_b = load("TS_b.mat");
-
-D_terminal = Tset_A.TS_A;
-c_terminal = Tset_b.TS_b;
+% Tset_A = load("TS_A.mat");
+% Tset_b = load("TS_b.mat");
+% 
+% D_terminal = Tset_A.TS_A;
+% c_terminal = Tset_b.TS_b;
 
 D_tilde_term = [D_terminal*sys_d.A];   %;-D_terminal*sys_d.A; zeros(1,dim_A); zeros(1,dim_A)];
 E_tilde_term = [D_terminal*sys_d.B];   %;-D_terminal*sys_d.B; 0; 0];

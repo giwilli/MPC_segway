@@ -1,15 +1,17 @@
 %% Cleanup and initialize
-% 
-% clc;
-% tbxmanager restorepath;
-% mpt_init;
-% 
-% %% Global Solver option
-% global mptOptions
-% mptOptions.verbose = 1;
+
+clc;
+tbxmanager restorepath;
+mpt_init;
+
+%% Global Solver option
+global MPTOPTIONS
+MPTOPTIONS.modules.geometry.sets.Polyhedron.projection.method = 'mplp';
+global mptOptions
+mptOptions.verbose = 1;
 
 %% Create the discretized system
-clear all;
+%clear all;
 close all;
 clc;
 Equations;
@@ -26,7 +28,7 @@ rank(obsv(sys_d.A, sys_d.C))
 
 %% Problem Fundamentals
 
-N = 75;
+N = 100;
 dim_A = size(A,1);
 dim_B = size(B,2);
 dim_C = size(C,1);
@@ -38,15 +40,15 @@ u_bound = 42;
 
 %% Constraints definition and Terminal Set
 
-% model = LTISystem(sys_d);
-% model.x.min = -c;
-% model.x.max = c;
-% model.u.min = -u_bound;
-% model.u.max = u_bound;
-% 
-% model.x.penalty = QuadFunction(Q);
-% model.u.penalty = QuadFunction(R);
-% P = model.LQRPenalty.weight;
+model = LTISystem(sys_d);
+model.x.min = -c;
+model.x.max = c;
+model.u.min = -u_bound;
+model.u.max = u_bound;
+
+model.x.penalty = QuadFunction(Q);
+model.u.penalty = QuadFunction(R);
+P = model.LQRPenalty.weight;
 
 %% Compact MPC Formulation
 
@@ -75,8 +77,8 @@ S_tilde = S(1:end-dim_A,:);
 %% Objective function weights (Compact Form)
 
 
-P = load("P.mat");
-P = P.P;
+%P = load("P.mat");
+%P = P.P;
 
 Q_bar = blkdiag(kron(eye(N),Q), P);
 R_bar = kron(eye(N),R);
@@ -88,14 +90,14 @@ H = (H+H')/2;
 %% Terminal Constraint Formulation
 
 %Tset = model.LQRSet;
-%D_terminal = Tset.A;
-%c_terminal = Tset.b;
+D_terminal = Tset.A;
+c_terminal = Tset.b;
 
-Tset_A = load("TS_A.mat");
-Tset_b = load("TS_b.mat");
-
-D_terminal = Tset_A.TS_A;
-c_terminal = Tset_b.TS_b;
+% Tset_A = load("TS_A.mat");
+% Tset_b = load("TS_b.mat");
+% 
+% D_terminal = Tset_A.TS_A;
+% c_terminal = Tset_b.TS_b;
 
 D_tilde_term = [D_terminal*sys_d.A];   %;-D_terminal*sys_d.A; zeros(1,dim_A); zeros(1,dim_A)];
 E_tilde_term = [D_terminal*sys_d.B];   %;-D_terminal*sys_d.B; 0; 0];
@@ -120,17 +122,18 @@ g = b_bar - D_bar*T_tilde*x0;
 
 %% Closed Loop global paramters
 
-sim_sec = 10;
+sim_sec = 30;
 t = 0:Ts:sim_sec;
 M = sim_sec/Ts;
 y_ref_final = 1;
 y_reg = zeros(1,M+1);
 y_constant = ones(1,M+1)* y_ref_final;
-y_square = square (pi*t/10);
+y_square = square(pi*t/10);
+y_sine = sin(t);
 y_linear = linspace(0,y_ref_final,M);
 
 %Reference given to the controller
-y_ref = y_constant;%[linspace(0,y_ref_final,M)];
+y_ref = y_square;%[linspace(0,y_ref_final,M)];
 %% Closed Loop MPC
 
 x_mpc = zeros(dim_A, (M+1));
@@ -190,7 +193,7 @@ for i = 1:M
     x_ref_normlog(:,i) = norm(x0 - x_ref);
     
     % Update of the terminal constraint
-    c_terminal = Tset_b.TS_b + D_terminal*x_ref;
+    c_terminal = Tset.b + D_terminal*x_ref;
     b_tilde_term = c_terminal;
     b_bar_term_temp = b_tilde_term;
     b_bar = [b_bar_temp;b_bar_term_temp];
@@ -211,32 +214,34 @@ for i = 1:M
 end
 %% LQR for reference
 
-% [K,S,P] = lqr(sys_d,Q,R);
-% x_lqr = zeros(dim_A, (M+1));
-% x_lqr(:,1) = x0;
-% u_lqr_log = zeros(dim_B, M+1);
-% u_lqr_log(:,1) = 0;
-% 
-% for i = 1:M
-%     %disp(i);
-%     u = -K*x_lqr(:,i);
-%     x_lqr(:,i+1) = (sys_d.A*x_lqr(:,i) + sys_d.B*u);
-%     u_lqr_log(:,i) = u;
-% end
+[K,S,P] = lqr(sys_d,Q,R);
+x_lqr = zeros(dim_A, (M+1));
+x_lqr(:,1) = x0;
+u_lqr_log = zeros(dim_B, M+1);
+u_lqr_log(:,1) = 0;
+
+for i = 1:M
+    %disp(i);
+    u = -K*x_lqr(:,i);
+    x_lqr(:,i+1) = (sys_d.A*x_lqr(:,i) + sys_d.B*u);
+    u_lqr_log(:,i) = u;
+end
 %% Plotting the MPC and LQR Response
 
 max_overshoot = 0.1*y_ref_final;
 ss_error = 0.02 *y_ref_final;
 
 subplot(1,1,1); % Top plot
+hold on
 plot(t, y_mpc(1,:))
+plot(t,y_ref)
 title('Output');
-legend('Baseline');
+legend('100','25','Reference');
 ylabel('$y$ [m]','interpreter','latex');
 xlabel('$t$ [s]','interpreter','latex');
 
-xlim([0, 10]);
-ylim([-0.2, 1.2]);
+%xlim([0, 10]);
+%ylim([-0.2, 1.2]);
 
 % (Optional) Adding '--r' makes them dashed red lines for better visibility
 yline(ss_error + y_ref_final, '--r', 'HandleVisibility', 'off'); 
