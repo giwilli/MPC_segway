@@ -1,8 +1,8 @@
 %% Cleanup and initialize
 % 
 % clc;
-%tbxmanager restorepath;
-%mpt_init;
+% tbxmanager restorepath;
+% mpt_init;
 % 
 % %% Global Solver option
 % global mptOptions
@@ -19,19 +19,14 @@ C = C_lin_s;
 D_sys = D_lin_s;
 
 Ts = 0.01;
-sys_d = c2d(ss(A,B, C, D_sys),Ts,'zoh');
+sys_d = c2d(ss(A,B, C, D_sys),Ts,'tustin');
 
-sys_d.A
-sys_d.B
-sys_d.C
-sys_d.D
-
-%rank(ctrb(sys_d.A, sys_d.B))
-%rank(obsv(sys_d.A, sys_d.C))
+rank(ctrb(sys_d.A, sys_d.B))
+rank(obsv(sys_d.A, sys_d.C))
 
 %% Problem Fundamentals
 
-N = 75;
+N = 100;
 dim_A = size(A,1);
 dim_B = size(B,2);
 dim_C = size(C,1);
@@ -113,7 +108,7 @@ E_bar_term_temp = kron(tmp,E_tilde_term);
 b_bar_term_temp = b_tilde_term;
 
 %% Constraint Concatination
-x0 = [0;0;0;0];
+x0 = [1;0;0;0];
 
 D_bar = [D_bar_temp;D_bar_term_temp];
 E_bar = [E_bar_temp;E_bar_term_temp];
@@ -125,94 +120,28 @@ g = b_bar - D_bar*T_tilde*x0;
 
 %% Closed Loop global paramters
 
-sim_sec = 10;
-t = 0:Ts:sim_sec;
-M = sim_sec/Ts;
+M = 600;
+t = 0:Ts:M*Ts;
 y_ref_final = 1;
-y_reg = zeros(1,M+1);
 y_constant = ones(1,M+1)* y_ref_final;
 y_square = square (pi*t/10);
 y_linear = linspace(0,y_ref_final,M);
-
-%Reference given to the controller
 y_ref = y_constant;%[linspace(0,y_ref_final,M)];
 %% Closed Loop MPC
 
 x_mpc = zeros(dim_A, (M+1));
-y_mpc = zeros(dim_C, (M+1));
 x_mpc(:,1) = x0;
-y_mpc(:,1) = 0;
 u_mpc_log = zeros(dim_B, M+1);
 u_mpc_log(:,1) = 0;
-n_d = 1;
-
-kalman_log = zeros(dim_A+n_d, (M+1));
-x_ref_normlog = zeros(dim_A, (M+1));
-
-d = 0.01;
-
-q_std = 0.00001;
-pos_std = 0.002;
-vel_std = 0.002;
-angv_std = 0.02;
-
-P_Kalm =  (1e-3)*eye(dim_A+n_d);
-Q_Kalm = q_std^2*eye(dim_A+n_d);
-R_Kalm = diag([pos_std^2 vel_std^2 angv_std^2]);
-
-w = sqrt(Q_Kalm)*randn(dim_A+n_d,M+1);
-v = sqrt(R_Kalm)*randn(dim_C,M+1);
-
-%plot(w)
-
-x_pred = [zeros(dim_A,1); zeros(n_d)];
-
-H_sel = [1 0 0];
-B_d = [0;0;0;0];
-C_d_sys = [0;0;1];
-H_aug = diag([0,0,0,0,1]);
-h_aug = zeros(5,1);
-
-%y = sys_d.C * x0 + C_d_sys*d + v(:,1);
-
-A_kalm = [sys_d.A B_d; zeros(n_d,dim_A) eye(n_d)];
-B_kalm = [sys_d.B; zeros(n_d)];
-C_kalm = [sys_d.C, C_d_sys];
-
-
-%[x_pred, P_Kalm] = Kalm_fn(A_kalm, B_kalm, C_kalm, sys_d.D, x_pred,P_Kalm,Q_Kalm,R_Kalm,y,u_mpc_log(:,1));
-%d_hat = x_pred(end-n_d+1:end);
 
 for i = 1:M
-    disp(i)
-    x0 = x_pred(1:4);
-    d_hat = x_pred(end,1);
-
-    % OTS
-    [x_ref, u_ref] = OTS(y_ref(i),H_sel,sys_d.A,sys_d.B,sys_d.C,B_d,C_d_sys,d_hat,D,c,u_bound,200,H_aug,h_aug);
-    x_ref_bar = repmat(x_ref,[N+1,1]);
-    u_ref_bar = repmat(u_ref,[N,1]);
-    x_ref_normlog(:,i) = norm(x0 - x_ref);
-    
-    % Update of the terminal constraint
-    c_terminal = Tset_b.TS_b + D_terminal*x_ref;
-    b_tilde_term = c_terminal;
-    b_bar_term_temp = b_tilde_term;
-    b_bar = [b_bar_temp;b_bar_term_temp];
+    disp(i);
+    x0 = x_mpc(:,i);
+    h = S.'*Q_bar*T*x0;
     g = b_bar - D_bar*T_tilde*x0;
-    
-    % Update of the cost function
-    h = S.'*Q_bar*(T*x0-x_ref_bar) - R_bar*u_ref_bar;
     u = quadprog(H,h, G,g);
     u_mpc_log(:,i) = u(1,:);
-
-    x_mpc(:,i+1) = sys_d.A*x_mpc(:,i) + sys_d.B*u(1) + B_d*d + w(1:end-n_d,i);
-    y = sys_d.C * x_mpc(:,i) + C_d_sys*d+ v(:,i);
-    y_mpc(:,i) = y;
-    
-    [x_pred, P_Kalm] = Kalm_fn(A_kalm, B_kalm, C_kalm, sys_d.D,x_pred,P_Kalm,Q_Kalm,R_Kalm,y,u(1));
-    %x_pred = [x_mpc(:,i+1);d];
-    kalman_log(:,i) = x_pred;
+    x_mpc(:,i+1) = sys_d.A*x_mpc(:,i) + sys_d.B*u(1);
 end
 %% LQR for reference
 
@@ -230,36 +159,16 @@ end
 % end
 %% Plotting the MPC and LQR Response
 
-max_overshoot = 0.1*y_ref_final;
-ss_error = 0.02 *y_ref_final;
-
-subplot(1,1,1); % Top plot
-plot(t, y_mpc(1,:))
-title('Output');
-legend('Baseline');
-ylabel('$y$ [m]','interpreter','latex');
-xlabel('$t$ [s]','interpreter','latex');
-
-xlim([0, 10]);
-ylim([-0.2, 1.2]);
-
-% (Optional) Adding '--r' makes them dashed red lines for better visibility
-yline(ss_error + y_ref_final, '--r', 'HandleVisibility', 'off'); 
-yline(-ss_error + y_ref_final, '--r', 'HandleVisibility', 'off');
-yline(max_overshoot + y_ref_final, '--k', 'HandleVisibility', 'off');
-
-grid on
-% hold on
-% plot(t,kalman_log(1,:))
-% plot(t,x_mpc(1,:))
-% subplot(4,1,3);
-% plot(t,kalman_log(5,:))
-% subplot(4,1,4);
-% plot(t,y_ref)
-% %plot(t, x_mpc(1,:))
-% %plot(t, x_mpc(1,:), t, x_lqr);
-% title('State Trajectories (x)');
-% legend('Reference');
+subplot(2,1,1);
+plot(t,x_mpc(1,:))
+title('State Trajectories (x)')
+legend('x1')
+subplot(2,1,2);
+plot(t,u_mpc_log(1,:))
+%plot(t, x_mpc(1,:))
+%plot(t, x_mpc(1,:), t, x_lqr);
+title('Control Input (u)');
+legend('u');
 
 %%
 % subplot(2,1,2); % Bottom plot
