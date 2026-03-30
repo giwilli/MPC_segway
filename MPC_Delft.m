@@ -7,8 +7,6 @@ mpt_init;
 %% Global Solver option
 global MPTOPTIONS
 MPTOPTIONS.modules.geometry.sets.Polyhedron.projection.method = 'mplp';
-global mptOptions
-mptOptions.verbose = 1;
 
 %% Create the discretized system
 %clear all;
@@ -21,10 +19,15 @@ C = C_lin_s;
 D_sys = D_lin_s;
 
 Ts = 0.01;
-sys_d = c2d(ss(A,B, C, D_sys),Ts,'tustin');
+sys_d = c2d(ss(A,B, C, D_sys),Ts,'zoh');
 
-rank(ctrb(sys_d.A, sys_d.B))
-rank(obsv(sys_d.A, sys_d.C))
+sys_d.A
+sys_d.B
+sys_d.C
+sys_d.D
+
+%rank(ctrb(sys_d.A, sys_d.B))
+%rank(obsv(sys_d.A, sys_d.C))
 
 %% Problem Fundamentals
 
