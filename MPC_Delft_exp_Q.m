@@ -15,7 +15,6 @@ close all;
 clc;
 disp('RESET');
 Equations;
-load_TSet = false;
 A = A_lin_s;
 B = B_lin_s;
 C = C_lin_s;
@@ -33,7 +32,7 @@ dim_C = size(C,1);
 
     % Running for different Q
 Q_values = [1,10,100,1000,10000];
-N = 25;
+N = 45;
 
     % Initialize a structure to hold your results
 results = struct();
@@ -60,6 +59,7 @@ for j = 1:length(Q_values)
     model.x.penalty = QuadFunction(Q);
     model.u.penalty = QuadFunction(R);
     P = model.LQRPenalty.weight;
+    load_TSet = false;
     if load_TSet
         Tset_Aload = load("TsetA_new.mat");
         Tset_bload = load("Tsetb_new.mat");
@@ -139,7 +139,7 @@ for j = 1:length(Q_values)
     sim_sec = 30;
     t = 0:Ts:sim_sec;
     M = sim_sec/Ts;
-    y_ref_final = 0.1;
+    y_ref_final = 1;
     y_reg = zeros(1,M+1);
     y_constant = ones(1,M+1)* y_ref_final;
     y_square = square(pi*t/10);
@@ -148,7 +148,7 @@ for j = 1:length(Q_values)
     y_step = (t>4);
     
         %Reference given to the controller
-    y_ref = y_step;%[linspace(0,y_ref_final,M)];
+    y_ref = y_constant;%[linspace(0,y_ref_final,M)];
 
         % Closed Loop MPC
     x_mpc = zeros(dim_A, (M+1));
@@ -246,7 +246,7 @@ plot(t,results.exp_10000.x(1,:))
 plot(t,y_ref)
 % plot(t,results.exp_100.x(1,:))
 legend('1','10','100', '1000', '10000','Reference');
-title('State Trajectories (x)');
+title('State Trajectories (x1)');
 subplot(2,1,2)
 hold on
 plot(t,results.exp_1.u(1,:))
