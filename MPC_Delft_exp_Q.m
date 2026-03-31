@@ -31,7 +31,7 @@ dim_B = size(B,2);
 dim_C = size(C,1);
 
     % Running for different Q
-Q_values = [1,10,100,1000,10000];
+Q_values = [1,10,100,1000];
 N = 45;
 
     % Initialize a structure to hold your results
@@ -236,25 +236,22 @@ for j = 1:length(Q_values)
     results.(expName).u = u_mpc_log;
 end
 %% Plot the different horizons
+raw_fields = fieldnames(results); 
+dynamic_labels = strrep(raw_fields, 'exp_', '');
+
 subplot(2,1,1)
 hold on
-plot(t,results.exp_1.x(1,:))
-plot(t,results.exp_10.x(1,:))
-plot(t,results.exp_100.x(1,:))
-plot(t,results.exp_1000.x(1,:))
-plot(t,results.exp_10000.x(1,:))
-plot(t,y_ref)
+grid on
+structfun(@(x) plot(t,x.x(1,:)), results);
+plot(t,y_ref, '--k')
 % plot(t,results.exp_100.x(1,:))
-legend('1','10','100', '1000', '10000','Reference');
+legend([dynamic_labels; {'Reference'}]);
 title('State Trajectories (x1)');
 subplot(2,1,2)
 hold on
-plot(t,results.exp_1.u(1,:))
-plot(t,results.exp_10.u(1,:))
-plot(t,results.exp_100.u(1,:))
-plot(t,results.exp_1000.u(1,:))
-plot(t,results.exp_10000.u(1,:))
-legend('1','10','100', '1000', '10000');
+grid on
+structfun(@(x) plot(t,x.u(1,:)), results);
+legend([dynamic_labels]);
 title('Input (u)');
 %% LQR for reference
 % 
