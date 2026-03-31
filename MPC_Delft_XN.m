@@ -21,21 +21,21 @@ C = C_lin_s;
 D_sys = D_lin_s;
 
 Ts = 0.01;
-sys_d = c2d(ss(A,B, C, D_sys),Ts,'tustin');
+sys_d = c2d(ss(A,B, C, D_sys),Ts,'zoh');
 
 rank(ctrb(sys_d.A, sys_d.B))
 rank(obsv(sys_d.A, sys_d.C))
 
 %% Problem Fundamentals
 
-N = 2;
+N = 50;
 dim_A = size(A,1);
 dim_B = size(B,2);
 dim_C = size(C,1);
 Q = 1000*eye(dim_A);
 R = 1*eye(dim_B);
 
-c = [Inf; 7; pi/18; Inf];
+c = [100; 7; pi/18; 100];
 u_bound = 42;
 
 %% Constraints definition and Terminal Set
@@ -62,7 +62,7 @@ for i = 1:N+1
     end
 end
 
-D = diag([0 1 1 0]);
+D = diag([1 1 1 1]);
 
 D_tilde = [D*sys_d.A;-D*sys_d.A; zeros(1,dim_A); zeros(1,dim_A)];
 E_tilde = [D*sys_d.B;-D*sys_d.B; 1; -1];
@@ -75,9 +75,9 @@ S_tilde = S(1:end-dim_A,:);
 
 %% Objective function weights (Compact Form)
 
+% P = load("P.mat");
+% P = P.P;
 
-%P = load("P.mat");
-%P = P.P;
 
 Q_bar = blkdiag(kron(eye(N),Q), P);
 R_bar = kron(eye(N),R);
@@ -89,6 +89,9 @@ H = (H+H')/2;
 %% Terminal Constraint Formulation
 
 Tset = model.LQRSet;
+Tset_A = Tset.A;
+Tset_b = Tset.b;
+
 D_terminal = Tset.A;
 c_terminal = Tset.b;
 
@@ -109,7 +112,7 @@ E_bar_term_temp = kron(tmp,E_tilde_term);
 b_bar_term_temp = b_tilde_term;
 
 %% Constraint Concatination
-x0 = [1;0;0;0];
+x0 = [0;0;0;0];
 
 D_bar = [D_bar_temp;D_bar_term_temp];
 E_bar = [E_bar_temp;E_bar_term_temp];
@@ -203,7 +206,7 @@ fprintf('\tdone!\n');
 % X_f within N steps
 
 fprintf('\tplotting results ... \n');
-figure(2);
+figure(1);
 hold on;
 
 r = 1;
@@ -281,8 +284,6 @@ ylim([-1.05*bnd_s, 1.05*bnd_s]);
 
 fprintf('\tdone! \n');
 %%
-
-%%
 % Plot convex hull of feasible points, and fill outside region in red
 
 fprintf('\tplotting results ... \n');
@@ -335,3 +336,57 @@ xlim(xL);
 ylim(yL);
 
 fprintf('\tdone! \n');
+
+%% Xf
+bnd_r = 6.5;
+bnd_s = pi/18;
+r = 1;
+res = 25;
+mat_plot_f = zeros(res,res);
+disp('Calculating: ')
+% loop through different initial conditions 
+for initial_r = linspace(-bnd_r,bnd_r,res)
+    disp(r)
+    s = 1;
+    for initial_s = linspace(-bnd_s,bnd_s,res)
+        x0 = [initial_r 0 initial_s 0]';
+        if Tset_A * x0 <= Tset_b
+            mat_plot_f(r,s) = 1;
+        end
+        s = s+1;
+    end
+    r = r+1;
+end
+
+fprintf('\tdone!\n');
+
+%% Plot Xf
+% plot the initial conditions which were steered towards the terminal set
+% X_f within N steps
+
+fprintf('\tplotting results ... \n');
+figure(2);
+hold on;
+
+r = 1;
+m_size = 11;
+for r_plot = linspace(-bnd_r,bnd_r,res)
+    s = 1;
+    disp(r)
+    for s_plot = linspace(-bnd_s,bnd_s,res)
+        if (mat_plot_f(r,s) == 1)
+            plot(r_plot,s_plot,'sg','MarkerFaceColor','g','MarkerEdgeColor','g','MarkerSize',m_size);
+        else
+            plot(r_plot,s_plot,'sr','MarkerFaceColor','w','MarkerEdgeColor','w','MarkerSize',m_size);
+        end
+        s = s+1;
+    end
+    r = r+1;
+end
+xlabel('x [m]', 'interpreter','latex');
+ylabel('$\varphi$ [rad]','interpreter','latex');
+grid on;
+xlim([-1.05*bnd_r 1.05*bnd_r]);
+ylim([-1.05*bnd_s 1.05*bnd_s]);
+fprintf('\tdone! \n');
+

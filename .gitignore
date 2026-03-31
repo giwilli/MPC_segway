@@ -1,6 +1,6 @@
 tbxmanager
 install_MPT3.m
-*.pdf
+*LagrangeCaseStudy*
 *.asv
 *.mat
 *.eps
@@ -8,4 +8,7 @@ Copy_of_HS_Assignment_2026_19.m
 Copy_2_of_HS_Assignment_2026_19.m
 HS_MPC.m
 HS_Assignment_2026_19.m
+<<<<<<< HEAD
 Grid_search_HS.m
+=======
+>>>>>>> ba149321a4f111998af77127a4925e13f4d07fcc
