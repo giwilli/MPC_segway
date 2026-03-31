@@ -30,50 +30,50 @@ rank(obsv(sys_d.A, sys_d.C));
 dim_A = size(A,1);
 dim_B = size(B,2);
 dim_C = size(C,1);
-Q = 1000*eye(dim_A);
-R = 1*eye(dim_B);
 
-c = [100; 7; pi/18; 100];
-u_bound = 42;
-
-    % Constraints definition and Terminal Set
-
-model = LTISystem(sys_d);
-model.x.min = -c;
-model.x.max = c;
-model.u.min = -u_bound;
-model.u.max = u_bound;
-
-model.x.penalty = QuadFunction(Q);
-model.u.penalty = QuadFunction(R);
-P = model.LQRPenalty.weight;
-if load_TSet
-    Tset_Aload = load("TsetA_new.mat");
-    Tset_bload = load("Tsetb_new.mat");
-
-    Tset_A = Tset_Aload.Tset_A_new;
-    Tset_b = Tset_bload.Tset_b_new;
-else
-    Tset = model.LQRSet;
-    Tset_A = Tset.A;
-    Tset_b = Tset.b;
-    
-end
-D_terminal = Tset_A;
-c_terminal = Tset_b;
-
-    % Running for different N
-N_values = [5,50];
+    % Running for different Q
+Q_values = [1,10,100,1000,10000];
+N = 25;
 
     % Initialize a structure to hold your results
 results = struct();
 
-for i = 1:length(N_values)
-    N = N_values(i);
-    disp('Current N is: ');
-    disp(N);
+for j = 1:length(Q_values)
+    Q_val = Q_values(j);
+    disp('Current Q is: ');
+    disp(Q_val);
     
+    Q = Q_val*eye(dim_A);
+    R = 1*eye(dim_B);
     
+    c = [100; 7; pi/18; 100];
+    u_bound = 42;
+    
+        % Constraints definition and Terminal Set
+    
+    model = LTISystem(sys_d);
+    model.x.min = -c;
+    model.x.max = c;
+    model.u.min = -u_bound;
+    model.u.max = u_bound;
+    
+    model.x.penalty = QuadFunction(Q);
+    model.u.penalty = QuadFunction(R);
+    P = model.LQRPenalty.weight;
+    if load_TSet
+        Tset_Aload = load("TsetA_new.mat");
+        Tset_bload = load("Tsetb_new.mat");
+    
+        Tset_A = Tset_Aload.Tset_A_new;
+        Tset_b = Tset_bload.Tset_b_new;
+    else
+        Tset = model.LQRSet;
+        Tset_A = Tset.A;
+        Tset_b = Tset.b;
+        
+    end
+    D_terminal = Tset_A;
+    c_terminal = Tset_b;
         % Compact MPC Formulation
     
     T = zeros(dim_A*(N+1),dim_A); 
@@ -125,7 +125,7 @@ for i = 1:length(N_values)
     b_bar_term_temp = b_tilde_term;
     
         % Constraint Concatination
-    x0 = [-2.0;0;0.14;0];
+    x0 = [0;0;0;0];
     
     D_bar = [D_bar_temp;D_bar_term_temp];
     E_bar = [E_bar_temp;E_bar_term_temp];
@@ -136,19 +136,19 @@ for i = 1:length(N_values)
     g = b_bar - D_bar*T_tilde*x0;
     
         % Closed Loop global paramters
-    sim_sec = 10;
+    sim_sec = 30;
     t = 0:Ts:sim_sec;
     M = sim_sec/Ts;
-    y_ref_final = 2;
+    y_ref_final = 0.1;
     y_reg = zeros(1,M+1);
     y_constant = ones(1,M+1)* y_ref_final;
     y_square = square(pi*t/10);
     y_sine = sin(t);
     y_linear = linspace(0,y_ref_final,M);
-    y_step = (t>4)*y_ref_final;
+    y_step = (t>4);
     
         %Reference given to the controller
-    y_ref = y_reg;%[linspace(0,y_ref_final,M)];
+    y_ref = y_step;%[linspace(0,y_ref_final,M)];
 
         % Closed Loop MPC
     x_mpc = zeros(dim_A, (M+1));
@@ -218,6 +218,7 @@ for i = 1:length(N_values)
         h = S.'*Q_bar*(T*x0-x_ref_bar) - R_bar*u_ref_bar;
         u = quadprog(H,h, G,g);
         u_mpc_log(:,i) = u(1,:);
+
     
         x_mpc(:,i+1) = sys_d.A*x_mpc(:,i) + sys_d.B*u(1) + B_d*d + w(1:end-n_d,i);
         y = sys_d.C * x_mpc(:,i) + C_d_sys*d+ v(:,i);
@@ -228,7 +229,7 @@ for i = 1:length(N_values)
         kalman_log(:,i) = x_pred;
     end
     % Create the dynamic field name (e.g., 'x_10')
-    expName = sprintf('exp_%d', N); 
+    expName = sprintf('exp_%d', Q_val); 
     
     % Save x and u inside that specific experiment's field
     results.(expName).x = x_mpc;
@@ -237,28 +238,23 @@ end
 %% Plot the different horizons
 subplot(2,1,1)
 hold on
-%plot(t,results.exp_1.x(1,:))
-%plot(t,results.exp_5.x(1,:))
-% plot(t,results.exp_10.x(1,:))
-%plot(t,results.exp_25.x(1,:))
-%plot(t,results.exp_50.x(1,:))
-plot(t,results.exp_50.x(1,:))
-plot(t,results.exp_150.x(1,:))
+plot(t,results.exp_1.x(1,:))
+plot(t,results.exp_10.x(1,:))
+plot(t,results.exp_100.x(1,:))
+plot(t,results.exp_1000.x(1,:))
+plot(t,results.exp_10000.x(1,:))
 plot(t,y_ref)
 % plot(t,results.exp_100.x(1,:))
-legend('50','150','Reference');
+legend('1','10','100', '1000', '10000','Reference');
 title('State Trajectories (x)');
 subplot(2,1,2)
 hold on
-%plot(t,results.exp_1.u(1,:))
-%plot(t,results.exp_5.u(1,:))
-% plot(t,results.exp_10.u(1,:))
-%plot(t,results.exp_25.u(1,:))
-% plot(t,results.exp_50.u(1,:))
-plot(t,results.exp_50.u(1,:))
-% plot(t,results.exp_100.u(1,:))
-plot(t,results.exp_150.u(1,:))
-legend('50','150');
+plot(t,results.exp_1.u(1,:))
+plot(t,results.exp_10.u(1,:))
+plot(t,results.exp_100.u(1,:))
+plot(t,results.exp_1000.u(1,:))
+plot(t,results.exp_10000.u(1,:))
+legend('1','10','100', '1000', '10000');
 title('Input (u)');
 %% LQR for reference
 % 
