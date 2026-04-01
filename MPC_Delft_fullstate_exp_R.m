@@ -31,8 +31,6 @@ dim_A = size(A,1);
 dim_B = size(B,2);
 dim_C = size(C,1);
 
-Q = 1000*eye(dim_A);
-R = 1*eye(dim_B);
 
 c = [100; 7; pi/18; 100];
 u_bound = 42;
@@ -43,38 +41,48 @@ model.x.max = c;
 model.u.min = -u_bound;
 model.u.max = u_bound;
 
-model.x.penalty = QuadFunction(Q);
-model.u.penalty = QuadFunction(R);
-%P = model.LQRPenalty.weight;
-[P,K,L] = idare(sys_d.A,sys_d.B,Q,R);
+
 %P = P*2;
 
-if load_TSet
-    Tset_Aload = load("TsetA_new.mat");
-    Tset_bload = load("Tsetb_new.mat");
 
-    Tset_A = Tset_Aload.Tset_A_new;
-    Tset_b = Tset_bload.Tset_b_new;
-else
-    Tset = model.LQRSet;
-    Tset_A = Tset.A;
-    Tset_b = Tset.b;
-    
-end
-D_terminal = Tset_A;
-c_terminal = Tset_b;
 %% Running for different N
-N_values = [30,35,40,45,50];
+R_values = [0.000001,0.00001,0.0001,0.001, 0.01];
+N = 45;
 
 % Initialize a structure to hold your results
 results = struct();
 
-for j = 1:length(N_values)
-    N = N_values(j);
-    disp('Current N is: ');
-    disp(N);
+for j = 1:length(R_values)
+    R_val = R_values(j);
+    disp('Current R is: ');
+    disp(R_val);
     
+
     tStart = tic;
+
+
+    Q = 1*eye(dim_A);
+    R = R_val*eye(dim_B);
+    model.x.penalty = QuadFunction(Q);
+    model.u.penalty = QuadFunction(R);
+    %P = model.LQRPenalty.weight;
+    [P,K,L] = idare(sys_d.A,sys_d.B,Q,R);
+
+    if load_TSet
+        Tset_Aload = load("TsetA_new.mat");
+        Tset_bload = load("Tsetb_new.mat");
+    
+        Tset_A = Tset_Aload.Tset_A_new;
+        Tset_b = Tset_bload.Tset_b_new;
+    else
+        Tset = model.LQRSet;
+        Tset_A = Tset.A;
+        Tset_b = Tset.b;
+        
+    end
+    D_terminal = Tset_A;
+    c_terminal = Tset_b;
+
     T = zeros(dim_A*(N+1),dim_A); 
     S = zeros(dim_A*(N+1), dim_B*N);
     
@@ -182,7 +190,7 @@ for j = 1:length(N_values)
     end 
     time_passed = toc(tStart);
     % Create the dynamic field name (e.g., 'x_10')
-    expName = sprintf('exp_%d', N); 
+    expName = sprintf('exp_%d', j); 
     
     % Save x and u inside that specific experiment's field
     results.(expName).x = x_mpc;
@@ -191,62 +199,69 @@ for j = 1:length(N_values)
     results.(expName).TC = TC_log;
     results.(expName).time = time_passed;
 end
-%% LQR for reference
-x0 = [1;0;0;0];
-[K,S,P] = lqr(sys_d,Q,R);
-x_lqr = zeros(dim_A, (M+1));
-x_lqr(:,1) = x0;
-u_lqr_log = zeros(dim_B, M+1);
-u_lqr_log(:,1) = 0;
-
-for i = 1:M
-    %disp(i);
-    u = -K*x_lqr(:,i);
-    x_lqr(:,i+1) = (sys_d.A*x_lqr(:,i) + sys_d.B*u);
-    u_lqr_log(:,i) = u;
-end
+save('results_R.mat', 'results');
 %% Plot the different horizons
-raw_fields = fieldnames(results); 
-dynamic_labels = strrep(raw_fields, 'exp_', '');
+% raw_fields = fieldnames(results); 
+% dynamic_labels = strrep(raw_fields, 'exp_', '');
+% ss_bounds = ones(1,M+1) * 0.02;
+% max_overshoot = ones(1,M+1)* 0.1;
+% 
+% subplot(1,1,1)
+% hold on
+% grid on
+% structfun(@(x) plot(t,x.x(1,:)), results);
+% % plot(t, -max_overshoot,'--r')
+% % plot(t,ss_bounds, '--k')
+% % plot(t,-ss_bounds, '--k')
+% % plot(t,results.exp_100.x(1,:))
+% legend([dynamic_labels]); %; {'Max overhoot'; 'Steady-state error'}
+% xlim([0, sim_sec]);
+% ylim([-0.2, 1.2]);
+% ylabel('$x$ [m]','interpreter','latex');
+% xlabel('Time [s]','interpreter','latex');
+% title('State Trajectories (x1)');
+% subplot(2,1,2)
+% hold on
+% grid on
+% structfun(@(x) plot(t,x.u(1,:)), results);
+% legend([dynamic_labels]);
+% title('State Trajectories (x2)');
 
-figure('Position', [100, 100, 800, 600]);
-subplot(3,1,1)
-hold on
-grid on
-plot(t,x_lqr(1,:));
-structfun(@(x) plot(t,x.x(1,:)), results);
-
-legend([{'LQR'};dynamic_labels]); %; {'Max overhoot'; 'Steady-state error'}
-xlim([0, sim_sec]);
-ylim([-0.2, 1.2]);
-ylabel('$x$ [m]','interpreter','latex');
-
-subplot(3,1,2)
-hold on
-grid on
-plot(t,u_lqr_log);
-structfun(@(x) plot(t,x.u(1,:)), results);
-legend([{'LQR'};dynamic_labels]); %; {'Max overhoot'; 'Steady-state error'}
-xlim([0, sim_sec]);
-ylabel('$u$ [rad/s]','interpreter','latex');
-xlabel('Time [s]','Interpreter','latex');
-
-subplot(3,1,3)
-hold on
-grid on
-time_evolution = structfun(@(x) x.time, results)';
-real_sim_time = ones(1,length(N_values)) * sim_sec;
-scatter(N_values,time_evolution,"filled");
-yline(10, '--r', 'HandleVisibility', 'off'); 
-xlim([min(N_values)-1, max(N_values)+1]);
-legend('Simulation Time','Location', 'southeast');
-ylabel('Time [s]','interpreter','latex');
-xlabel('Horizon $N$ [-]','Interpreter','latex');
-
+% subplot(3,1,3);
+% hold on
+% % Extract the 'time' field from every sub-structure in 'results'
+% time_evolution = structfun(@(x) x.time, results)';
+% real_sim_time = ones(1,length(R_values)) * sim_sec;
+% plot(R_values,time_evolution);
+% plot(R_values,real_sim_time, '--r')
+% xlim([min(R_values), max(R_values)]);
+% legend('t', 'Real sim time');
 % title('Total Runtime per N');
 
+% subplot(3,1,3)
+% hold on
+% plot(t(1:M),results.exp_50.TC);
+% plot(t(1:M),results.exp_50.SC);
+% plot(t(1:M),results.exp_50.TC + results.exp_50.SC);
+% plot(t(1:M),results.exp_100.TC);
+% plot(t(1:M),results.exp_100.SC);
+% plot(t(1:M),results.exp_100.TC + results.exp_100.SC);
+% legend('TC50','SC50','total50','TC100','SC100','total100');
+% title('Total Cost');
+%% LQR for reference
 
-
+% [K,S,P] = lqr(sys_d,Q,R);
+% x_lqr = zeros(dim_A, (M+1));
+% x_lqr(:,1) = x0;
+% u_lqr_log = zeros(dim_B, M+1);
+% u_lqr_log(:,1) = 0;
+% 
+% for i = 1:M
+%     %disp(i);
+%     u = -K*x_lqr(:,i);
+%     x_lqr(:,i+1) = (sys_d.A*x_lqr(:,i) + sys_d.B*u);
+%     u_lqr_log(:,i) = u;
+% end
 %% Plotting the MPC and LQR Response
 
 % subplot(2,1,1);
