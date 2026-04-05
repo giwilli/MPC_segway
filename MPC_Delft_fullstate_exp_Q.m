@@ -1,5 +1,5 @@
 %% Cleanup and initialize
-clear all
+
 clc;
 tbxmanager restorepath;
 mpt_init;
@@ -7,21 +7,22 @@ mpt_init;
 %% Global Solver option
 global MPTOPTIONS
 MPTOPTIONS.modules.geometry.sets.Polyhedron.projection.method = 'mplp';
-%MPTOPTIONS.verbose = 1;
-
+% global mptOptions
+% mptOptions.verbose = 1;
+% mptOptions.infbound = 500; % Increase from the default 100
 %% Create the discretized system
 clear all;
 close all;
 clc;
-disp('RESET');
 Equations;
+load_TSet = false;
 A = A_lin_s;
 B = B_lin_s;
 C = C_lin_s;
 D_sys = D_lin_s;
 
 Ts = 0.01;
-sys_d = c2d(ss(A,B, C, D_sys),Ts,'tustin');
+sys_d = c2d(ss(A,B, C, D_sys),Ts,'zoh');
 
 rank(ctrb(sys_d.A, sys_d.B));
 rank(obsv(sys_d.A, sys_d.C));
@@ -30,11 +31,25 @@ dim_A = size(A,1);
 dim_B = size(B,2);
 dim_C = size(C,1);
 
-    % Running for different Q
-Q_values = [1,10,100,1000];
+
+c = [100; 7; pi/18; 100];
+u_bound = 42;
+
+model = LTISystem(sys_d);
+model.x.min = -c;
+model.x.max = c;
+model.u.min = -u_bound;
+model.u.max = u_bound;
+
+
+%P = P*2;
+
+
+%% Running for different N
+Q_values = [100,1000,10000,100000,1000000];
 N = 45;
 
-    % Initialize a structure to hold your results
+% Initialize a structure to hold your results
 results = struct();
 
 for j = 1:length(Q_values)
@@ -42,24 +57,17 @@ for j = 1:length(Q_values)
     disp('Current Q is: ');
     disp(Q_val);
     
+
+    tStart = tic;
+
+
     Q = Q_val*eye(dim_A);
     R = 1*eye(dim_B);
-    
-    c = [100; 7; pi/18; 100];
-    u_bound = 42;
-    
-        % Constraints definition and Terminal Set
-    
-    model = LTISystem(sys_d);
-    model.x.min = -c;
-    model.x.max = c;
-    model.u.min = -u_bound;
-    model.u.max = u_bound;
-    
     model.x.penalty = QuadFunction(Q);
     model.u.penalty = QuadFunction(R);
-    P = model.LQRPenalty.weight;
-    load_TSet = false;
+    %P = model.LQRPenalty.weight;
+    [P,K,L] = idare(sys_d.A,sys_d.B,Q,R);
+
     if load_TSet
         Tset_Aload = load("TsetA_new.mat");
         Tset_bload = load("Tsetb_new.mat");
@@ -74,8 +82,7 @@ for j = 1:length(Q_values)
     end
     D_terminal = Tset_A;
     c_terminal = Tset_b;
-        % Compact MPC Formulation
-    
+
     T = zeros(dim_A*(N+1),dim_A); 
     S = zeros(dim_A*(N+1), dim_B*N);
     
@@ -98,7 +105,7 @@ for j = 1:length(Q_values)
     T_tilde = T(1:end-dim_A,:);
     S_tilde = S(1:end-dim_A,:);
     
-        % Objective function weights (Compact Form) 
+    
     %P = load("P.mat");
     %P = P.P;
     
@@ -109,10 +116,7 @@ for j = 1:length(Q_values)
     H = (H+H')/2;
     
     %h = S.'*Q_bar*T*x0;
-
-        % Terminal Constraint Formulation
-    
-    % 
+   
     
     D_tilde_term = [D_terminal*sys_d.A];   %;-D_terminal*sys_d.A; zeros(1,dim_A); zeros(1,dim_A)];
     E_tilde_term = [D_terminal*sys_d.B];   %;-D_terminal*sys_d.B; 0; 0];
@@ -124,8 +128,7 @@ for j = 1:length(Q_values)
     E_bar_term_temp = kron(tmp,E_tilde_term);
     b_bar_term_temp = b_tilde_term;
     
-        % Constraint Concatination
-    x0 = [0;0;0;0];
+    x0 = [1;0;0;0];
     
     D_bar = [D_bar_temp;D_bar_term_temp];
     E_bar = [E_bar_temp;E_bar_term_temp];
@@ -135,126 +138,110 @@ for j = 1:length(Q_values)
     
     g = b_bar - D_bar*T_tilde*x0;
     
-        % Closed Loop global paramters
-    sim_sec = 30;
+    
+    
+    sim_sec = 10;
     t = 0:Ts:sim_sec;
     M = sim_sec/Ts;
-    y_ref_final = 0;
-    y_reg = zeros(1,M+1);
+    t = 0:Ts:M*Ts;
+    y_ref_final = 1;
     y_constant = ones(1,M+1)* y_ref_final;
     y_square = square(pi*t/10);
     y_sine = sin(t);
     y_linear = linspace(0,y_ref_final,M);
-    y_step = (t>4);
-    
-        %Reference given to the controller
     y_ref = y_constant;%[linspace(0,y_ref_final,M)];
 
-        % Closed Loop MPC
     x_mpc = zeros(dim_A, (M+1));
-    y_mpc = zeros(dim_C, (M+1));
     x_mpc(:,1) = x0;
-    y_mpc(:,1) = 0;
     u_mpc_log = zeros(dim_B, M+1);
     u_mpc_log(:,1) = 0;
-    n_d = 1;
-    
-    kalman_log = zeros(dim_A+n_d, (M+1));
-    x_ref_normlog = zeros(dim_A, (M+1));
-    
-    d = 0.0;
-    
-    q_std = 0.00001;
-    pos_std = 0.002;
-    vel_std = 0.002;
-    angv_std = 0.02;
-    
-    P_Kalm =  (1e-3)*eye(dim_A+n_d);
-    Q_Kalm = q_std^2*eye(dim_A+n_d);
-    R_Kalm = diag([pos_std^2 vel_std^2 angv_std^2]);
-    
-    w = sqrt(Q_Kalm)*randn(dim_A+n_d,M+1)* 0;
-    v = sqrt(R_Kalm)*randn(dim_C,M+1)*0;
-    
-    %plot(w)
-    
-    x_pred = [zeros(dim_A,1); zeros(n_d)];
-    
-    H_sel = [1 0 0];
-    B_d = [0;0;0;0];
-    C_d_sys = [0;0;1];
-    H_aug = diag([0,0,0,0,1]);
-    h_aug = zeros(5,1);
-    
-    %y = sys_d.C * x0 + C_d_sys*d + v(:,1);
-    
-    A_kalm = [sys_d.A B_d; zeros(n_d,dim_A) eye(n_d)];
-    B_kalm = [sys_d.B; zeros(n_d)];
-    C_kalm = [sys_d.C, C_d_sys];
-    
-    
-    %[x_pred, P_Kalm] = Kalm_fn(A_kalm, B_kalm, C_kalm, sys_d.D, x_pred,P_Kalm,Q_Kalm,R_Kalm,y,u_mpc_log(:,1));
-    %d_hat = x_pred(end-n_d+1:end);
+    SC_log = zeros(1,M);
+    TC_log = zeros(1,M);
     
     for i = 1:M
-        disp(i)
-        x0 = x_pred(1:4);
-        d_hat = x_pred(end,1);
-    
-        % OTS
-        [x_ref, u_ref] = OTS(y_ref(i),H_sel,sys_d.A,sys_d.B,sys_d.C,B_d,C_d_sys,d_hat,D,c,u_bound,200,H_aug,h_aug);
-        x_ref_bar = repmat(x_ref,[N+1,1]);
-        u_ref_bar = repmat(u_ref,[N,1]);
-        x_ref_normlog(:,i) = norm(x0 - x_ref);
-        
-        % Update of the terminal constraint
-        c_terminal = Tset_b + D_terminal*x_ref;
-        b_tilde_term = c_terminal;
-        b_bar_term_temp = b_tilde_term;
-        b_bar = [b_bar_temp;b_bar_term_temp];
+        disp(i);
+        x0 = x_mpc(:,i);
+        h = S.'*Q_bar*T*x0;
         g = b_bar - D_bar*T_tilde*x0;
-        
-        % Update of the cost function
-        h = S.'*Q_bar*(T*x0-x_ref_bar) - R_bar*u_ref_bar;
         u = quadprog(H,h, G,g);
         u_mpc_log(:,i) = u(1,:);
-
-    
-        x_mpc(:,i+1) = sys_d.A*x_mpc(:,i) + sys_d.B*u(1) + B_d*d + w(1:end-n_d,i);
-        y = sys_d.C * x_mpc(:,i) + C_d_sys*d+ v(:,i);
-        y_mpc(:,i) = y;
+        x_mpc(:,i+1) = sys_d.A*x_mpc(:,i) + sys_d.B*u(1);
+        % --- COST LOGGING ---
+        % Reconstruct the full predicted trajectory: X_pred = [x_0; x_1; ...; x_N]
+        X_pred = T*x0 + S*u;
+        U_pred = u;
         
-        [x_pred, P_Kalm] = Kalm_fn(A_kalm, B_kalm, C_kalm, sys_d.D,x_pred,P_Kalm,Q_Kalm,R_Kalm,y,u(1));
-        %x_pred = [x_mpc(:,i+1);d];
-        kalman_log(:,i) = x_pred;
-    end
+        % 1. TERMINAL COST (TC)
+        % Extract the error at the final prediction step, x_N
+        x_N_pred = X_pred(end-dim_A+1 : end);
+        TC_log(i) = x_N_pred.' * P * x_N_pred;
+        
+        X_pred_stages = X_pred(dim_A+1 : end-dim_A); 
+        
+        % Create the Q matrix for just the N-1 intermediate stages
+        Q_stages = kron(eye(N-1), Q);
+        
+        % Calculate cumulative state and input costs over the horizon
+        SC_states = X_pred_stages.' * Q_stages * X_pred_stages;
+        SC_inputs = U_pred.' * R_bar * U_pred;
+       
+        SC_log(i) = SC_states + SC_inputs;
+        % --------------------
+    end 
+    time_passed = toc(tStart);
     % Create the dynamic field name (e.g., 'x_10')
     expName = sprintf('exp_%d', Q_val); 
     
     % Save x and u inside that specific experiment's field
     results.(expName).x = x_mpc;
     results.(expName).u = u_mpc_log;
+    results.(expName).SC = SC_log;
+    results.(expName).TC = TC_log;
+    results.(expName).time = time_passed;
 end
+save('results_Q.mat', 'results');
 %% Plot the different horizons
 raw_fields = fieldnames(results); 
 dynamic_labels = strrep(raw_fields, 'exp_', '');
 
-subplot(2,1,1)
+subplot(1,1,1)
 hold on
 grid on
 structfun(@(x) plot(t,x.x(1,:)), results);
-plot(t,y_ref, '--k')
 % plot(t,results.exp_100.x(1,:))
-legend([dynamic_labels; {'Reference'}]);
-title('State Trajectories (x1)');
-subplot(2,1,2)
-hold on
-grid on
-structfun(@(x) plot(t,x.u(1,:)), results);
 legend([dynamic_labels]);
-title('Input (u)');
-%% LQR for reference
+title('State Trajectories (x1)');
+
+% subplot(3,1,2)
+% hold on
+% grid on
+% structfun(@(x) plot(t,x.u(1,:)), results);
+% legend([dynamic_labels]);
+% title('Input (u)');
 % 
+% subplot(3,1,3);
+% hold on
+% % Extract the 'time' field from every sub-structure in 'results'
+% time_evolution = structfun(@(x) x.time, results)';
+% real_sim_time = ones(1,length(N_values)) * sim_sec;
+% plot(N_values,time_evolution);
+% plot(N_values,real_sim_time, '--r')
+% xlim([min(N_values), max(N_values)]);
+% legend('t', 'Real sim time');
+% title('Total Runtime per N');
+
+% subplot(3,1,3)
+% hold on
+% plot(t(1:M),results.exp_50.TC);
+% plot(t(1:M),results.exp_50.SC);
+% plot(t(1:M),results.exp_50.TC + results.exp_50.SC);
+% plot(t(1:M),results.exp_100.TC);
+% plot(t(1:M),results.exp_100.SC);
+% plot(t(1:M),results.exp_100.TC + results.exp_100.SC);
+% legend('TC50','SC50','total50','TC100','SC100','total100');
+% title('Total Cost');
+%% LQR for reference
+
 % [K,S,P] = lqr(sys_d,Q,R);
 % x_lqr = zeros(dim_A, (M+1));
 % x_lqr(:,1) = x0;
@@ -268,25 +255,16 @@ title('Input (u)');
 %     u_lqr_log(:,i) = u;
 % end
 %% Plotting the MPC and LQR Response
-% 
-% max_overshoot = 0.1*y_ref_final;
-% ss_error = 0.02 *y_ref_final;
-% 
-% subplot(1,1,1); % Top plot
-% hold on
-% plot(t, y_mpc(1,:))
-% plot(t,y_ref)
-% title('Output');
-% legend('100','25','Reference');
-% ylabel('$y$ [m]','interpreter','latex');
-% xlabel('$t$ [s]','interpreter','latex');
-% 
-% %xlim([0, 10]);
-% %ylim([-0.2, 1.2]);
-% 
-% % (Optional) Adding '--r' makes them dashed red lines for better visibility
-% yline(ss_error + y_ref_final, '--r', 'HandleVisibility', 'off'); 
-% yline(-ss_error + y_ref_final, '--r', 'HandleVisibility', 'off');
-% yline(max_overshoot + y_ref_final, '--k', 'HandleVisibility', 'off');
-% 
-% grid on
+
+% subplot(2,1,1);
+% plot(t,x_mpc(1,:))
+% title('State Trajectories (x)')
+% legend('x1')
+% subplot(2,1,2);
+% plot(t,u_mpc_log(1,:))
+% %plot(t, x_mpc(1,:))
+% %plot(t, x_mpc(1,:), t, x_lqr);
+% title('Control Input (u)');
+% legend('u');
+
+
