@@ -28,14 +28,14 @@ rank(obsv(sys_d.A, sys_d.C))
 
 %% Problem Fundamentals
 
-N = 50;
+N = 45;
 dim_A = size(A,1);
 dim_B = size(B,2);
 dim_C = size(C,1);
 Q = 1000*eye(dim_A);
 R = 1*eye(dim_B);
 
-c = [100; 7; pi/18; 100];
+c = [10^6; 7; pi/18; 10^6];
 u_bound = 42;
 
 %% Constraints definition and Terminal Set
@@ -389,4 +389,82 @@ grid on;
 xlim([-1.05*bnd_r 1.05*bnd_r]);
 ylim([-1.05*bnd_s 1.05*bnd_s]);
 fprintf('\tdone! \n');
+
+%% Plot X_N and X_f together using their convex hulls
+% Assumes mat_plot   = X_N feasibility grid
+%         mat_plot_f = X_f feasibility grid
+% and that both use the same r_vals / s_vals definition
+
+fprintf('\tplotting X_N and X_f together ... \n');
+figure; clf;
+hold on;
+
+% Grid corresponding to mat_plot / mat_plot_f
+r_vals = linspace(-bnd_r, bnd_r, res);
+s_vals = linspace(-bnd_s, bnd_s, res);
+[R, S] = ndgrid(r_vals, s_vals);
+
+% Plot limits
+xL = [-1.05*bnd_r, 1.05*bnd_r];
+yL = [-1.05*bnd_s, 1.05*bnd_s];
+
+% Fill whole domain red first
+fill([xL(1) xL(2) xL(2) xL(1)], ...
+     [yL(1) yL(1) yL(2) yL(2)], ...
+     'r', 'EdgeColor', 'none', 'FaceAlpha', 0.35);
+
+%---- X_N (green) ----
+idx_N = (mat_plot == 1);
+x_N = R(idx_N);
+y_N = S(idx_N);
+
+if ~isempty(x_N)
+    if numel(x_N) >= 3
+        kN = convhull(x_N, y_N);
+        fill(x_N(kN), y_N(kN), 'g', ...
+            'FaceAlpha', 0.45, ...
+            'EdgeColor', 'g', ...
+            'LineWidth', 1.5);
+        plot(x_N(kN), y_N(kN), 'g-', 'LineWidth', 1.5);
+    else
+        plot(x_N, y_N, 'sg', ...
+            'MarkerFaceColor', 'g', ...
+            'MarkerEdgeColor', 'g', ...
+            'MarkerSize', 8);
+    end
+else
+    warning('No positive points found in mat_plot (X_N).');
+end
+
+%---- X_f (blue) ----
+idx_f = (mat_plot_f == 1);
+x_f = R(idx_f);
+y_f = S(idx_f);
+
+if ~isempty(x_f)
+    if numel(x_f) >= 3
+        kf = convhull(x_f, y_f);
+        fill(x_f(kf), y_f(kf), 'b', ...
+            'FaceAlpha', 0.55, ...
+            'EdgeColor', 'b', ...
+            'LineWidth', 1.5);
+        plot(x_f(kf), y_f(kf), 'b-', 'LineWidth', 1.5);
+    else
+        plot(x_f, y_f, 'sb', ...
+            'MarkerFaceColor', 'b', ...
+            'MarkerEdgeColor', 'b', ...
+            'MarkerSize', 8);
+    end
+else
+    warning('No positive points found in mat_plot_f (X_f).');
+end
+
+xlabel('x [m]', 'Interpreter', 'latex');
+ylabel('$\varphi$ [rad]', 'Interpreter', 'latex');
+grid on;
+xlim(xL);
+ylim(yL);
+
+fprintf('\tdone! \n');
+
 
