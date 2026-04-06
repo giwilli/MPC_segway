@@ -19,34 +19,34 @@ dynamic_labels_R = strrep(raw_fields_R, 'exp_', '');
 ss_bounds = ones(1,M+1) * 0.02;
 max_overshoot = ones(1,M+1)* 0.1;
 
-figure('Position', [100, 100, 800, 400]);
+figure('Position', [100, 100, 800, 530]);
 subplot(2,1,1)
 hold on
 grid on
 structfun(@(x) plot(t,x.x(1,:)), results_Q);
-legend([dynamic_labels_Q]); %; {'Max overhoot'; 'Steady-state error'}
+legend([dynamic_labels_Q],FontSize=14); %; {'Max overhoot'; 'Steady-state error'}
 xlim([0, sim_sec]);
 ylim([-0.2, 1.2]);
-ylabel('$x$ [m]','interpreter','latex');
+ylabel('$x$ [m]','interpreter','latex','FontSize', 22);
 subplot(2,1,2)
 hold on
 grid on
 structfun(@(x) plot(t,x.x(1,:)), results_R);
-legend('0.000001','0.00001','0,0001','0.001', '0.01'); %; {'Max overhoot'; 'Steady-state error'}
+legend('0.000001','0.00001','0,0001','0.001', '0.01',FontSize=14); %; {'Max overhoot'; 'Steady-state error'}
 xlim([0, sim_sec]);
 ylim([-0.2, 1.2]);
-ylabel('$x$ [m]','interpreter','latex')
-xlabel('Time [s]','interpreter','latex');
+ylabel('$x$ [m]','interpreter','latex','FontSize', 22)
+xlabel('Time [s]','interpreter','latex','FontSize', 22);
 
-figure('Position', [100, 100, 800, 200]);
+figure('Position', [100, 100, 800, 265]);
 subplot(1,1,1)
 hold on
 grid on
 structfun(@(x) plot(t,x.u(1,:)), results_Q);
-legend([dynamic_labels_Q]); %; {'Max overhoot'; 'Steady-state error'}
+legend([dynamic_labels_Q],FontSize=14); %; {'Max overhoot'; 'Steady-state error'}
 xlim([0, sim_sec]);
-ylabel('$u$ [rad/s]','interpreter','latex');
-xlabel('Time [s]','interpreter','latex');
+ylabel('$u$ [Nm]','interpreter','latex','FontSize', 22);
+xlabel('Time [s]','interpreter','latex','FontSize', 22);
 
 % subplot(2,1,2)
 % hold on

@@ -29,7 +29,7 @@ rank(obsv(sys_d.A, sys_d.C))
 
 %% Problem Fundamentals
 
-N = 50;
+N = 45;
 dim_A = size(A,1);
 dim_B = size(B,2);
 dim_C = size(C,1);
@@ -133,48 +133,6 @@ y_constant = ones(1,M+1)* y_ref_final;
 y_square = square (pi*t/10);
 y_linear = linspace(0,y_ref_final,M);
 y_ref = y_constant;%[linspace(0,y_ref_final,M)];
-%% Closed Loop MPC
-
-% x_mpc = zeros(dim_A, (M+1));
-% x_mpc(:,1) = x0;
-% u_mpc_log = zeros(dim_B, M+1);
-% u_mpc_log(:,1) = 0;
-% 
-% for i = 1:M
-%     disp(i);
-%     x0 = x_mpc(:,i);
-%     h = S.'*Q_bar*T*x0;
-%     g = b_bar - D_bar*T_tilde*x0;
-%     u = quadprog(H,h, G,g);
-%     u_mpc_log(:,i) = u(1,:);
-%     x_mpc(:,i+1) = sys_d.A*x_mpc(:,i) + sys_d.B*u(1);
-% end
-%% LQR for reference
-
-% [K,S,P] = lqr(sys_d,Q,R);
-% x_lqr = zeros(dim_A, (M+1));
-% x_lqr(:,1) = x0;
-% u_lqr_log = zeros(dim_B, M+1);
-% u_lqr_log(:,1) = 0;
-% 
-% for i = 1:M
-%     %disp(i);
-%     u = -K*x_lqr(:,i);
-%     x_lqr(:,i+1) = (sys_d.A*x_lqr(:,i) + sys_d.B*u);
-%     u_lqr_log(:,i) = u;
-% end
-%% Plotting the MPC and LQR Response
-
-% subplot(2,1,1);
-% plot(t,x_mpc(1,:))
-% title('State Trajectories (x)')
-% legend('x1')
-% subplot(2,1,2);
-% plot(t,u_mpc_log(1,:))
-% %plot(t, x_mpc(1,:))
-% %plot(t, x_mpc(1,:), t, x_lqr);
-% title('Control Input (u)');
-% legend('u');
 
 %%
 bnd_r = 6.5;

@@ -49,7 +49,7 @@ model.u.penalty = QuadFunction(R);
 %P = model.LQRPenalty.weight;
 
 %% Running for different N
-N = 50;
+N = 45;
 P_factors = [0.1 1 10];
 
 % Initialize a structure to hold your results
@@ -205,36 +205,7 @@ plot(t,results.exp_3.x(1,:))
 % plot(t,results.exp_150.x(1,:))
 legend('0.1','1', '10');
 title('State Trajectories (x1)');
-% subplot(5,1,2)
-% hold on
-% plot(t,results.exp_5.x(2,:))
-% plot(t,results.exp_10.x(2,:))
-% plot(t,results.exp_25.x(2,:))
-% plot(t,results.exp_50.x(2,:))
-% plot(t,results.exp_75.x(2,:))
-% plot(t,results.exp_100.x(2,:))
-% legend('5', '10', '25','50', '75', '100');
-% title('State Trajectories (x2)');
-% subplot(5,1,3)
-% hold on
-% plot(t,results.exp_5.x(3,:))
-% plot(t,results.exp_10.x(3,:))
-% plot(t,results.exp_25.x(3,:))
-% plot(t,results.exp_50.x(3,:))
-% plot(t,results.exp_75.x(3,:))
-% plot(t,results.exp_100.x(3,:))
-% legend('5', '10', '25','50', '75', '100');
-% title('State Trajectories (x3)');
-% subplot(5,1,4)
-% hold on
-% plot(t,results.exp_5.x(4,:))
-% plot(t,results.exp_10.x(4,:))
-% plot(t,results.exp_25.x(4,:))
-% plot(t,results.exp_50.x(4,:))
-% plot(t,results.exp_75.x(4,:))
-% plot(t,results.exp_100.x(4,:))
-% legend('5', '10', '25','50', '75', '100');
-% title('State Trajectories (x4)');
+
 subplot(3,1,2)
 hold on
 %plot(t,results.exp_1.u(1,:))
@@ -249,7 +220,7 @@ plot(t,results.exp_3.u(1,:))
 legend('0.1','1', '10');
 title('Input (u)');
 
-subplot(4,1,3)
+subplot(3,1,3)
 hold on
 plot(t(1:M),results.exp_1.TC);
 plot(t(1:M),results.exp_1.SC);
@@ -262,31 +233,3 @@ plot(t(1:M),results.exp_3.SC);
 plot(t(1:M),results.exp_3.TC + results.exp_3.SC);
 legend('TC0.1','SC0.1','total0.1','TC1','SC1','total1','TC10','SC10','total10');
 title('Total Cost');
-%% LQR for reference
-
-% [K,S,P] = lqr(sys_d,Q,R);
-% x_lqr = zeros(dim_A, (M+1));
-% x_lqr(:,1) = x0;
-% u_lqr_log = zeros(dim_B, M+1);
-% u_lqr_log(:,1) = 0;
-% 
-% for i = 1:M
-%     %disp(i);
-%     u = -K*x_lqr(:,i);
-%     x_lqr(:,i+1) = (sys_d.A*x_lqr(:,i) + sys_d.B*u);
-%     u_lqr_log(:,i) = u;
-% end
-%% Plotting the MPC and LQR Response
-
-% subplot(2,1,1);
-% plot(t,x_mpc(1,:))
-% title('State Trajectories (x)')
-% legend('x1')
-% subplot(2,1,2);
-% plot(t,u_mpc_log(1,:))
-% %plot(t, x_mpc(1,:))
-% %plot(t, x_mpc(1,:), t, x_lqr);
-% title('Control Input (u)');
-% legend('u');
-
-

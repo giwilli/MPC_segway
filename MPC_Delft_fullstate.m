@@ -7,28 +7,26 @@ mpt_init;
 %% Global Solver option
 global MPTOPTIONS
 MPTOPTIONS.modules.geometry.sets.Polyhedron.projection.method = 'mplp';
-global mptOptions
-mptOptions.verbose = 1;
-mptOptions.infbound = 500; % Increase from the default 100
 %% Create the discretized system
 %clear all;
 close all;
 clc;
 Equations;
+load_Tset = false;
 A = A_lin_s;
 B = B_lin_s;
 C = C_lin_s;
 D_sys = D_lin_s;
 
 Ts = 0.01;
-sys_d = c2d(ss(A,B, C, D_sys),Ts,'tustin');
+sys_d = c2d(ss(A,B, C, D_sys),Ts,'zoh');
 
 rank(ctrb(sys_d.A, sys_d.B))
 rank(obsv(sys_d.A, sys_d.C))
 
 %% Problem Fundamentals
 
-N = 25;
+N = 45;
 dim_A = size(A,1);
 dim_B = size(B,2);
 dim_C = size(C,1);
@@ -89,15 +87,16 @@ H = (H+H')/2;
 %h = S.'*Q_bar*T*x0;
 %% Terminal Constraint Formulation
 
-%Tset = model.LQRSet;
-D_terminal = Tset.A;
-c_terminal = Tset.b;
+if load_TSet
+    Tset_Aload = load("data/Tset_A_Q1000R1.mat");
+    Tset_bload = load("data/Tset_b_Q1000R1.mat");
 
-% Tset_A = load("TS_A.mat");
-% Tset_b = load("TS_b.mat");
-% 
-% D_terminal = Tset_A.TS_A;
-% c_terminal = Tset_b.TS_b;
+    Tset_A = Tset_Aload.Tset_A;
+    Tset_b = Tset_bload.Tset_b;
+else
+    Tset = model.LQRSet;
+    Tset_A = Tset.A;
+    Tset_b = Tset.b;
 
 D_tilde_term = [D_terminal*sys_d.A];   %;-D_terminal*sys_d.A; zeros(1,dim_A); zeros(1,dim_A)];
 E_tilde_term = [D_terminal*sys_d.B];   %;-D_terminal*sys_d.B; 0; 0];

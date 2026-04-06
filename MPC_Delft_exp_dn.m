@@ -7,12 +7,15 @@ mpt_init;
 %% Global Solver option
 global MPTOPTIONS
 MPTOPTIONS.modules.geometry.sets.Polyhedron.projection.method = 'mplp';
+%MPTOPTIONS.verbose = 1;
+
 %% Create the discretized system
 clear all;
 close all;
 clc;
 disp('RESET');
 Equations;
+load_TSet = true;
 A = A_lin_s;
 B = B_lin_s;
 C = C_lin_s;
@@ -27,50 +30,46 @@ rank(obsv(sys_d.A, sys_d.C));
 dim_A = size(A,1);
 dim_B = size(B,2);
 dim_C = size(C,1);
+Q = 1000*eye(dim_A);
+R = 1*eye(dim_B);
 
-    % Running for different Q
-Q_values = [1,10,100,1000];
+c = [100; 7; pi/18; 100];
+u_bound = 42;
+
+    % Constraints definition and Terminal Set
+
+model = LTISystem(sys_d);
+model.x.min = -c;
+model.x.max = c;
+model.u.min = -u_bound;
+model.u.max = u_bound;
+
+model.x.penalty = QuadFunction(Q);
+model.u.penalty = QuadFunction(R);
+P = model.LQRPenalty.weight;
+if load_TSet
+    Tset_Aload = load("data/Tset_A_Q1000R1.mat");
+    Tset_bload = load("data/Tset_b_Q1000R1.mat");
+
+    Tset_A = Tset_Aload.Tset_A;
+    Tset_b = Tset_bload.Tset_b;
+else
+    Tset = model.LQRSet;
+    Tset_A = Tset.A;
+    Tset_b = Tset.b;
+    
+end
+D_terminal = Tset_A;
+c_terminal = Tset_b;
+
+    % Running for different N
 N = 45;
+d_values = [0 0.1 0.2 0.3 0.4];
 
     % Initialize a structure to hold your results
 results = struct();
 
-for j = 1:length(Q_values)
-    Q_val = Q_values(j);
-    disp('Current Q is: ');
-    disp(Q_val);
-    
-    Q = Q_val*eye(dim_A);
-    R = 1*eye(dim_B);
-    
-    c = [100; 7; pi/18; 100];
-    u_bound = 42;
-    
-        % Constraints definition and Terminal Set
-    
-    model = LTISystem(sys_d);
-    model.x.min = -c;
-    model.x.max = c;
-    model.u.min = -u_bound;
-    model.u.max = u_bound;
-    
-    model.x.penalty = QuadFunction(Q);
-    model.u.penalty = QuadFunction(R);
-    P = model.LQRPenalty.weight;
-    load_TSet = false;
-    if load_TSet
-        Tset_Aload = load("data/Tset_A_Q1000R1.mat");
-        Tset_bload = load("data/Tset_b_Q1000R1.mat");
-    
-        Tset_A = Tset_Aload.Tset_A;
-        Tset_b = Tset_bload.Tset_b;
-    else
-        Tset = model.LQRSet;
-        Tset_A = Tset.A;
-        Tset_b = Tset.b;
-    end
-    D_terminal = Tset_A;
-    c_terminal = Tset_b;
+for d_it = 1:length(d_values)
         % Compact MPC Formulation
     
     T = zeros(dim_A*(N+1),dim_A); 
@@ -133,19 +132,19 @@ for j = 1:length(Q_values)
     g = b_bar - D_bar*T_tilde*x0;
     
         % Closed Loop global paramters
-    sim_sec = 30;
+    sim_sec = 15;
     t = 0:Ts:sim_sec;
     M = sim_sec/Ts;
-    y_ref_final = 0;
+    y_ref_final = 1;
     y_reg = zeros(1,M+1);
     y_constant = ones(1,M+1)* y_ref_final;
     y_square = square(pi*t/10);
     y_sine = sin(t);
     y_linear = linspace(0,y_ref_final,M);
-    y_step = (t>4);
+    y_step = (t>7.5)*y_ref_final;
     
         %Reference given to the controller
-    y_ref = y_constant;%[linspace(0,y_ref_final,M)];
+    y_ref = y_step;%[linspace(0,y_ref_final,M)];
 
         % Closed Loop MPC
     x_mpc = zeros(dim_A, (M+1));
@@ -154,12 +153,12 @@ for j = 1:length(Q_values)
     y_mpc(:,1) = 0;
     u_mpc_log = zeros(dim_B, M+1);
     u_mpc_log(:,1) = 0;
+    x_ref_log = zeros(dim_A, (M+1));
+    u_ref_log = zeros(dim_B, M+1);
     n_d = 1;
     
     kalman_log = zeros(dim_A+n_d, (M+1));
     x_ref_normlog = zeros(dim_A, (M+1));
-    
-    d = 0.0;
     
     q_std = 0.00001;
     pos_std = 0.002;
@@ -170,16 +169,20 @@ for j = 1:length(Q_values)
     Q_Kalm = q_std^2*eye(dim_A+n_d);
     R_Kalm = diag([pos_std^2 vel_std^2 angv_std^2]);
     
-    w = sqrt(Q_Kalm)*randn(dim_A+n_d,M+1)* 0;
-    v = sqrt(R_Kalm)*randn(dim_C,M+1)*0;
+    w = sqrt(Q_Kalm)*randn(dim_A+n_d,M+1);
+    v = sqrt(R_Kalm)*randn(dim_C,M+1);
+
+    d = d_values(d_it);
+    disp('Current d is: ');
+    disp(d);
     
     %plot(w)
     
     x_pred = [zeros(dim_A,1); zeros(n_d)];
     
     H_sel = [1 0 0];
-    B_d = [0;0;0;0];
-    C_d_sys = [0;0;1];
+    B_d = sys_d.B;
+    C_d_sys = [0;0;0];
     H_aug = diag([0,0,0,0,1]);
     h_aug = zeros(5,1);
     
@@ -202,7 +205,8 @@ for j = 1:length(Q_values)
         [x_ref, u_ref] = OTS(y_ref(i),H_sel,sys_d.A,sys_d.B,sys_d.C,B_d,C_d_sys,d_hat,D,c,u_bound,200,H_aug,h_aug);
         x_ref_bar = repmat(x_ref,[N+1,1]);
         u_ref_bar = repmat(u_ref,[N,1]);
-        x_ref_normlog(:,i) = norm(x0 - x_ref);
+        x_ref_log(:,i) = x_ref;
+        u_ref_log(:,i) = u_ref;
         
         % Update of the terminal constraint
         c_terminal = Tset_b + D_terminal*x_ref;
@@ -215,7 +219,6 @@ for j = 1:length(Q_values)
         h = S.'*Q_bar*(T*x0-x_ref_bar) - R_bar*u_ref_bar;
         u = quadprog(H,h, G,g);
         u_mpc_log(:,i) = u(1,:);
-
     
         x_mpc(:,i+1) = sys_d.A*x_mpc(:,i) + sys_d.B*u(1) + B_d*d + w(1:end-n_d,i);
         y = sys_d.C * x_mpc(:,i) + C_d_sys*d+ v(:,i);
@@ -226,27 +229,38 @@ for j = 1:length(Q_values)
         kalman_log(:,i) = x_pred;
     end
     % Create the dynamic field name (e.g., 'x_10')
-    expName = sprintf('exp_%d', Q_val); 
+    expName = sprintf('exp_%d', d_it); 
     
     % Save x and u inside that specific experiment's field
     results.(expName).x = x_mpc;
     results.(expName).u = u_mpc_log;
-end
-%% Plot the different horizons
-raw_fields = fieldnames(results); 
-dynamic_labels = strrep(raw_fields, 'exp_', '');
+    results.(expName).y = y_mpc;
+    results.(expName).kalman_pred = kalman_log;
+    results.(expName).x_ref = x_ref_log;
+    results.(expName).u_ref = u_ref_log;
 
-subplot(2,1,1)
+end
+save('results_dn.mat', 'results');
+%% Plot
+legend_entries = string(d_values(:));
+
+figure('Position',[100, 100, 800, 795]);
+subplot(3,1,1);
 hold on
 grid on
-structfun(@(x) plot(t,x.x(1,:)), results);
-plot(t,y_ref, '--k')
-% plot(t,results.exp_100.x(1,:))
-legend([dynamic_labels; {'Reference'}]);
-title('State Trajectories (x1)');
-subplot(2,1,2)
+structfun(@(r) plot(t,r.x(1,:)),results)
+ylabel('$x$ [m]','interpreter','latex','FontSize', 22)
+subplot(3,1,2);
 hold on
 grid on
-structfun(@(x) plot(t,x.u(1,:)), results);
-legend([dynamic_labels]);
-title('Input (u)');
+structfun(@(r) plot(t,r.u),results)
+ylabel('$u$ [Nm]','interpreter','latex','FontSize', 22)
+subplot(3,1,3);
+hold on
+grid on
+structfun(@(r) plot(t(1:end-1),r.y(1,1:end-1)),results)
+plot(t,y_ref,'--r');
+legend([legend_entries;'Reference'],'Location','best',FontSize=14);
+ylabel('$y$ [m]','Interpreter','latex','FontSize', 22)
+xlabel('Time [s]','interpreter','latex','FontSize', 22);
+

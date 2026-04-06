@@ -125,7 +125,7 @@ g = b_bar - D_bar*T_tilde*x0;
 
 %% Closed Loop global paramters
 
-sim_sec = 30;
+sim_sec = 15;
 t = 0:Ts:sim_sec;
 M = sim_sec/Ts;
 y_ref_final = 1;

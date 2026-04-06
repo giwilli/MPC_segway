@@ -47,5 +47,5 @@ D_lin_s = double(subs(D_lin, [m,l,R,M,I,theta, g], [m_n, l_n,R_n, M_n, I_n, thet
 
 %%
 state_space = ss(A_lin_s,B_lin_s,C_lin_s,D_lin_s);
-state_space_d = c2d(state_space, T_sample, "tustin");
+state_space_d = c2d(state_space, T_sample, "zoh");
 

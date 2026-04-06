@@ -7,15 +7,12 @@ mpt_init;
 %% Global Solver option
 global MPTOPTIONS
 MPTOPTIONS.modules.geometry.sets.Polyhedron.projection.method = 'mplp';
-% global mptOptions
-% mptOptions.verbose = 1;
-% mptOptions.infbound = 500; % Increase from the default 100
 %% Create the discretized system
 clear all;
 close all;
 clc;
 Equations;
-load_TSet = false;
+load_TSet = true;
 A = A_lin_s;
 B = B_lin_s;
 C = C_lin_s;
@@ -50,11 +47,11 @@ model.u.penalty = QuadFunction(R);
 %P = P*2;
 
 if load_TSet
-    Tset_Aload = load("TsetA_new.mat");
-    Tset_bload = load("Tsetb_new.mat");
+    Tset_Aload = load("data/Tset_A_Q1000R1.mat");
+    Tset_bload = load("data/Tset_b_Q1000R1.mat");
 
-    Tset_A = Tset_Aload.Tset_A_new;
-    Tset_b = Tset_bload.Tset_b_new;
+    Tset_A = Tset_Aload.Tset_A;
+    Tset_b = Tset_bload.Tset_b;
 else
     Tset = model.LQRSet;
     Tset_A = Tset.A;
@@ -149,7 +146,6 @@ for j = 1:length(N_values)
     u_mpc_log(:,1) = 0;
     SC_log = zeros(1,M);
     TC_log = zeros(1,M);
-    
     for i = 1:M
         disp(i);
         x0 = x_mpc(:,i);
@@ -209,27 +205,28 @@ end
 raw_fields = fieldnames(results); 
 dynamic_labels = strrep(raw_fields, 'exp_', '');
 
-figure('Position', [100, 100, 800, 600]);
+
+figure('Position', [100, 100, 800, 759]);
 subplot(3,1,1)
 hold on
 grid on
 plot(t,x_lqr(1,:));
 structfun(@(x) plot(t,x.x(1,:)), results);
 
-legend([{'LQR'};dynamic_labels]); %; {'Max overhoot'; 'Steady-state error'}
+legend([{'LQR'};dynamic_labels],'Location','best',FontSize=14); %; {'Max overhoot'; 'Steady-state error'}
 xlim([0, sim_sec]);
 ylim([-0.2, 1.2]);
-ylabel('$x$ [m]','interpreter','latex');
+ylabel('$x$ [m]','interpreter','latex', 'FontSize', 22);
 
 subplot(3,1,2)
 hold on
 grid on
 plot(t,u_lqr_log);
 structfun(@(x) plot(t,x.u(1,:)), results);
-legend([{'LQR'};dynamic_labels]); %; {'Max overhoot'; 'Steady-state error'}
+ %; {'Max overhoot'; 'Steady-state error'}
 xlim([0, sim_sec]);
-ylabel('$u$ [rad/s]','interpreter','latex');
-xlabel('Time [s]','Interpreter','latex');
+ylabel('$u$ [Nm]','interpreter','latex', 'FontSize', 22);
+xlabel('Time [s]','Interpreter','latex','FontSize', 22);
 
 subplot(3,1,3)
 hold on
@@ -239,25 +236,6 @@ real_sim_time = ones(1,length(N_values)) * sim_sec;
 scatter(N_values,time_evolution,"filled");
 yline(10, '--r', 'HandleVisibility', 'off'); 
 xlim([min(N_values)-1, max(N_values)+1]);
-legend('Simulation Time','Location', 'southeast');
-ylabel('Time [s]','interpreter','latex');
-xlabel('Horizon $N$ [-]','Interpreter','latex');
-
-% title('Total Runtime per N');
-
-
-
-%% Plotting the MPC and LQR Response
-
-% subplot(2,1,1);
-% plot(t,x_mpc(1,:))
-% title('State Trajectories (x)')
-% legend('x1')
-% subplot(2,1,2);
-% plot(t,u_mpc_log(1,:))
-% %plot(t, x_mpc(1,:))
-% %plot(t, x_mpc(1,:), t, x_lqr);
-% title('Control Input (u)');
-% legend('u');
-
-
+legend('Simulation','Location', 'northwest',FontSize=14);
+ylabel('Runtime [s]','interpreter','latex', 'FontSize', 22);
+xlabel('Horizon $N$ [-]','Interpreter','latex', 'FontSize', 22);

@@ -7,8 +7,6 @@ mpt_init;
 %% Global Solver option
 global MPTOPTIONS
 MPTOPTIONS.modules.geometry.sets.Polyhedron.projection.method = 'mplp';
-%MPTOPTIONS.verbose = 1;
-
 %% Create the discretized system
 clear all;
 close all;
@@ -21,7 +19,7 @@ C = C_lin_s;
 D_sys = D_lin_s;
 
 Ts = 0.01;
-sys_d = c2d(ss(A,B, C, D_sys),Ts,'tustin');
+sys_d = c2d(ss(A,B, C, D_sys),Ts,'zoh');
 
 rank(ctrb(sys_d.A, sys_d.B));
 rank(obsv(sys_d.A, sys_d.C));
@@ -61,15 +59,15 @@ for j = 1:length(R_values)
     P = model.LQRPenalty.weight;
     load_TSet = false;
     if load_TSet
-        Tset_Aload = load("TsetA_new.mat");
-        Tset_bload = load("Tsetb_new.mat");
-    
-        Tset_A = Tset_Aload.Tset_A_new;
-        Tset_b = Tset_bload.Tset_b_new;
-    else
-        Tset = model.LQRSet;
-        Tset_A = Tset.A;
-        Tset_b = Tset.b;
+    Tset_Aload = load("data/Tset_A_Q1000R1.mat");
+    Tset_bload = load("data/Tset_b_Q1000R1.mat");
+
+    Tset_A = Tset_Aload.Tset_A;
+    Tset_b = Tset_bload.Tset_b;
+else
+    Tset = model.LQRSet;
+    Tset_A = Tset.A;
+    Tset_b = Tset.b;
         
     end
     D_terminal = Tset_A;
@@ -108,11 +106,6 @@ for j = 1:length(R_values)
     H = S.'*Q_bar*S + R_bar;
     H = (H+H')/2;
     
-    %h = S.'*Q_bar*T*x0;
-
-        % Terminal Constraint Formulation
-    
-    % 
     
     D_tilde_term = [D_terminal*sys_d.A];   %;-D_terminal*sys_d.A; zeros(1,dim_A); zeros(1,dim_A)];
     E_tilde_term = [D_terminal*sys_d.B];   %;-D_terminal*sys_d.B; 0; 0];
@@ -253,40 +246,3 @@ grid on
 structfun(@(x) plot(t,x.u(1,:)), results);
 legend([dynamic_labels]);
 title('Input (u)');
-%% LQR for reference
-% 
-% [K,S,P] = lqr(sys_d,Q,R);
-% x_lqr = zeros(dim_A, (M+1));
-% x_lqr(:,1) = x0;
-% u_lqr_log = zeros(dim_B, M+1);
-% u_lqr_log(:,1) = 0;
-% 
-% for i = 1:M
-%     %disp(i);
-%     u = -K*x_lqr(:,i);
-%     x_lqr(:,i+1) = (sys_d.A*x_lqr(:,i) + sys_d.B*u);
-%     u_lqr_log(:,i) = u;
-% end
-%% Plotting the MPC and LQR Response
-% 
-% max_overshoot = 0.1*y_ref_final;
-% ss_error = 0.02 *y_ref_final;
-% 
-% subplot(1,1,1); % Top plot
-% hold on
-% plot(t, y_mpc(1,:))
-% plot(t,y_ref)
-% title('Output');
-% legend('100','25','Reference');
-% ylabel('$y$ [m]','interpreter','latex');
-% xlabel('$t$ [s]','interpreter','latex');
-% 
-% %xlim([0, 10]);
-% %ylim([-0.2, 1.2]);
-% 
-% % (Optional) Adding '--r' makes them dashed red lines for better visibility
-% yline(ss_error + y_ref_final, '--r', 'HandleVisibility', 'off'); 
-% yline(-ss_error + y_ref_final, '--r', 'HandleVisibility', 'off');
-% yline(max_overshoot + y_ref_final, '--k', 'HandleVisibility', 'off');
-% 
-% grid on
