@@ -1,5 +1,4 @@
 %% Cleanup and initialize
-
 clc;
 tbxmanager restorepath;
 mpt_init;
@@ -36,7 +35,7 @@ dim_C = size(C,1);
 Q = 1000*eye(dim_A);
 R = 1*eye(dim_B);
 
-c = [100; 7; pi/18; 100];
+c = [10^6; 7; pi/18; 10^6];
 u_bound = 42;
 
 %% Constraints definition and Terminal Set
@@ -46,7 +45,6 @@ model.x.min = -c;
 model.x.max = c;
 model.u.min = -u_bound;
 model.u.max = u_bound;
-
 model.x.penalty = QuadFunction(Q);
 model.u.penalty = QuadFunction(R);
 P = model.LQRPenalty.weight;
@@ -77,9 +75,9 @@ S_tilde = S(1:end-dim_A,:);
 
 %% Objective function weights (Compact Form)
 
-
 % P = load("P.mat");
 % P = P.P;
+
 
 Q_bar = blkdiag(kron(eye(N),Q), P);
 R_bar = kron(eye(N),R);
@@ -191,6 +189,112 @@ xlim([-1.05*bnd_r 1.05*bnd_r]);
 ylim([-1.05*bnd_s 1.05*bnd_s]);
 fprintf('\tdone! \n');
 
+%%
+% Plot the convex hull of the initial conditions that can be steered
+% to the terminal set X_f within N steps
+
+fprintf('\tplotting results ... \n');
+figure(2); clf;
+hold on;
+
+% Grid corresponding to mat_plot
+r_vals = linspace(-bnd_r, bnd_r, res);
+s_vals = linspace(-bnd_s, bnd_s, res);
+
+% Build coordinate matrices so indices match mat_plot(r,s)
+[R, S] = ndgrid(r_vals, s_vals);
+
+% Extract all positive points
+idx_pos = (mat_plot == 1);
+x_pos = R(idx_pos);
+y_pos = S(idx_pos);
+
+if ~isempty(x_pos)
+    if numel(x_pos) >= 3
+        % Compute convex hull
+        k = convhull(x_pos, y_pos);
+
+        % Filled convex hull
+        fill(x_pos(k), y_pos(k), 'g', ...
+            'FaceAlpha', 0.3, ...
+            'EdgeColor', 'g', ...
+            'LineWidth', 1.5);
+
+        % Optional: plot hull vertices / boundary
+        plot(x_pos(k), y_pos(k), 'g-', 'LineWidth', 1.5);
+    else
+        % Fallback if too few points for a hull
+        plot(x_pos, y_pos, 'sg', ...
+            'MarkerFaceColor', 'g', ...
+            'MarkerEdgeColor', 'g', ...
+            'MarkerSize', 8);
+    end
+else
+    warning('No positive points found in mat_plot.');
+end
+
+xlabel('x [m]', 'Interpreter', 'latex');
+ylabel('$\varphi$ [rad]', 'Interpreter', 'latex');
+grid on;
+%axis equal;
+xlim([-1.05*bnd_r, 1.05*bnd_r]);
+ylim([-1.05*bnd_s, 1.05*bnd_s]);
+
+fprintf('\tdone! \n');
+%%
+% Plot convex hull of feasible points, and fill outside region in red
+
+fprintf('\tplotting results ... \n');
+figure(2); clf;
+hold on;
+
+% Grid corresponding to mat_plot
+r_vals = linspace(-bnd_r, bnd_r, res);
+s_vals = linspace(-bnd_s, bnd_s, res);
+[R, S] = ndgrid(r_vals, s_vals);
+
+% Extract feasible points
+idx_pos = (mat_plot == 1);
+x_pos = R(idx_pos);
+y_pos = S(idx_pos);
+
+% Plot limits
+xL = [-1.05*bnd_r, 1.05*bnd_r];
+yL = [-1.05*bnd_s, 1.05*bnd_s];
+
+% Fill whole domain red first
+fill([xL(1) xL(2) xL(2) xL(1)], ...
+     [yL(1) yL(1) yL(2) yL(2)], ...
+     'r', 'EdgeColor', 'none','FaceAlpha', 0.40);
+
+if ~isempty(x_pos) && numel(x_pos) >= 3
+    % Convex hull of feasible set
+    k = convhull(x_pos, y_pos);
+
+    % Fill feasible region on top
+    fill(x_pos(k), y_pos(k), 'g', ...
+        'FaceAlpha', 0.50, ...
+        'EdgeColor', 'g', ...
+        'LineWidth', 1.5);
+
+    plot(x_pos(k), y_pos(k), 'k-', 'LineWidth', 1.5, 'Color', 'g');
+elseif ~isempty(x_pos)
+    plot(x_pos, y_pos, 'sg', ...
+        'MarkerFaceColor', 'g', ...
+        'MarkerEdgeColor', 'g', ...
+        'MarkerSize', 8);
+else
+    warning('No positive points found in mat_plot.');
+end
+
+xlabel('x [m]', 'Interpreter', 'latex');
+ylabel('$\varphi$ [rad]', 'Interpreter', 'latex');
+grid on;
+xlim(xL);
+ylim(yL);
+
+fprintf('\tdone! \n');
+
 %% Xf
 bnd_r = 6.5;
 bnd_s = pi/18;
@@ -243,3 +347,82 @@ grid on;
 xlim([-1.05*bnd_r 1.05*bnd_r]);
 ylim([-1.05*bnd_s 1.05*bnd_s]);
 fprintf('\tdone! \n');
+
+%% Plot X_N and X_f together using their convex hulls
+% Assumes mat_plot   = X_N feasibility grid
+%         mat_plot_f = X_f feasibility grid
+% and that both use the same r_vals / s_vals definition
+
+fprintf('\tplotting X_N and X_f together ... \n');
+figure; clf;
+hold on;
+
+% Grid corresponding to mat_plot / mat_plot_f
+r_vals = linspace(-bnd_r, bnd_r, res);
+s_vals = linspace(-bnd_s, bnd_s, res);
+[R, S] = ndgrid(r_vals, s_vals);
+
+% Plot limits
+xL = [-1.05*bnd_r, 1.05*bnd_r];
+yL = [-1.05*bnd_s, 1.05*bnd_s];
+
+% Fill whole domain red first
+fill([xL(1) xL(2) xL(2) xL(1)], ...
+     [yL(1) yL(1) yL(2) yL(2)], ...
+     'r', 'EdgeColor', 'none', 'FaceAlpha', 0.35);
+
+%---- X_N (green) ----
+idx_N = (mat_plot == 1);
+x_N = R(idx_N);
+y_N = S(idx_N);
+
+if ~isempty(x_N)
+    if numel(x_N) >= 3
+        kN = convhull(x_N, y_N);
+        fill(x_N(kN), y_N(kN), 'g', ...
+            'FaceAlpha', 0.45, ...
+            'EdgeColor', 'g', ...
+            'LineWidth', 1.5);
+        plot(x_N(kN), y_N(kN), 'g-', 'LineWidth', 1.5);
+    else
+        plot(x_N, y_N, 'sg', ...
+            'MarkerFaceColor', 'g', ...
+            'MarkerEdgeColor', 'g', ...
+            'MarkerSize', 8);
+    end
+else
+    warning('No positive points found in mat_plot (X_N).');
+end
+
+%---- X_f (blue) ----
+idx_f = (mat_plot_f == 1);
+x_f = R(idx_f);
+y_f = S(idx_f);
+
+if ~isempty(x_f)
+    if numel(x_f) >= 3
+        kf = convhull(x_f, y_f);
+        fill(x_f(kf), y_f(kf), 'b', ...
+            'FaceAlpha', 0.55, ...
+            'EdgeColor', 'b', ...
+            'LineWidth', 1.5);
+        plot(x_f(kf), y_f(kf), 'b-', 'LineWidth', 1.5);
+    else
+        plot(x_f, y_f, 'sb', ...
+            'MarkerFaceColor', 'b', ...
+            'MarkerEdgeColor', 'b', ...
+            'MarkerSize', 8);
+    end
+else
+    warning('No positive points found in mat_plot_f (X_f).');
+end
+
+xlabel('x [m]', 'Interpreter', 'latex');
+ylabel('$\varphi$ [rad]', 'Interpreter', 'latex');
+grid on;
+xlim(xL);
+ylim(yL);
+
+fprintf('\tdone! \n');
+
+
