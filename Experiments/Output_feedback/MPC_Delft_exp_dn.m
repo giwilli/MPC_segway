@@ -14,7 +14,7 @@ clear all;
 close all;
 clc;
 disp('RESET');
-Equations;
+run('../../Equations.m');
 load_TSet = true;
 A = A_lin_s;
 B = B_lin_s;
@@ -48,8 +48,8 @@ model.x.penalty = QuadFunction(Q);
 model.u.penalty = QuadFunction(R);
 P = model.LQRPenalty.weight;
 if load_TSet
-    Tset_Aload = load("data/Tset_A_Q1000R1.mat");
-    Tset_bload = load("data/Tset_b_Q1000R1.mat");
+    Tset_Aload = load("../../data/Tset_A_Q1000R1.mat");
+    Tset_bload = load("../../data/Tset_A_Q1000R1.mat");
 
     Tset_A = Tset_Aload.Tset_A;
     Tset_b = Tset_bload.Tset_b;

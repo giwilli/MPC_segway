@@ -14,7 +14,7 @@ MPTOPTIONS.modules.geometry.sets.Polyhedron.projection.method = 'mplp';
 clear all;
 close all;
 clc;
-Equations;
+run('../../Equations.m');
 load_TSet = false;
 A = A_lin_s;
 B = B_lin_s;
@@ -69,8 +69,8 @@ for j = 1:length(Q_values)
     [P,K,L] = idare(sys_d.A,sys_d.B,Q,R);
 
     if load_TSet
-        Tset_Aload = load("TsetA_new.mat");
-        Tset_bload = load("Tsetb_new.mat");
+        Tset_Aload = load("../../data/Tset_A_Q1000R1.mat");
+        Tset_bload = load("../../data/Tset_A_Q1000R1.mat");
     
         Tset_A = Tset_Aload.Tset_A_new;
         Tset_b = Tset_bload.Tset_b_new;

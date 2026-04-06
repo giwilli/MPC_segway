@@ -11,7 +11,7 @@ MPTOPTIONS.modules.geometry.sets.Polyhedron.projection.method = 'mplp';
 clear all;
 close all;
 clc;
-Equations;
+run('../../Equations.m');
 load_TSet = true;
 A = A_lin_s;
 B = B_lin_s;
@@ -47,8 +47,8 @@ model.u.penalty = QuadFunction(R);
 %P = P*2;
 
 if load_TSet
-    Tset_Aload = load("data/Tset_A_Q1000R1.mat");
-    Tset_bload = load("data/Tset_b_Q1000R1.mat");
+    Tset_Aload = load("../../data/Tset_A_Q1000R1.mat");
+    Tset_bload = load("../../data/Tset_b_Q1000R1.mat");
 
     Tset_A = Tset_Aload.Tset_A;
     Tset_b = Tset_bload.Tset_b;
