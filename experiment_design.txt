@@ -1,7 +1,0 @@
-1. Regulation problem: Set y_ref = 0, Vary x0 and track the stabilisation
-2. Reference Tracking in position: Set y_ref = 'cool position'
-3. Reference Tracking in velocity: Set y_ref = 'cool speed'
-
-If possible: y = sin(x_1)
-
-Optional: Show robustness for heavier person. Or how large disturbances we can reject.
